@@ -2,13 +2,13 @@
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 <domain> <deploy-user>"
+  echo "Usage: $0 <domain> <deploy-user> [app-dir]"
   exit 1
 fi
 
 DOMAIN="$1"
 DEPLOY_USER="$2"
-APP_DIR="/opt/midi-invaders"
+APP_DIR="${3:-/opt/midi-invaders}"
 
 sudo apt update
 sudo apt install -y curl git unzip ca-certificates
@@ -30,9 +30,11 @@ sudo apt install -y caddy
 
 sudo cp ops/systemd/midi-invaders-api.service /etc/systemd/system/midi-invaders-api.service
 sudo sed -i "s|^User=.*|User=${DEPLOY_USER}|g" /etc/systemd/system/midi-invaders-api.service
+sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=${APP_DIR}|g" /etc/systemd/system/midi-invaders-api.service
 
 sudo cp ops/caddy/Caddyfile /etc/caddy/Caddyfile
 sudo sed -i "s|example.com|${DOMAIN}|g" /etc/caddy/Caddyfile
+sudo sed -i "s|root \\* /opt/midi-invaders/apps/web/dist|root * ${APP_DIR}/apps/web/dist|g" /etc/caddy/Caddyfile
 
 sudo mkdir -p /etc/midi-invaders
 echo "Create /etc/midi-invaders/api.env with DATABASE_URL, PORT=3001, HOST=127.0.0.1"

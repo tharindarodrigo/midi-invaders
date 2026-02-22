@@ -22,6 +22,12 @@ chmod +x ops/scripts/bootstrap-vm.sh
 ./ops/scripts/bootstrap-vm.sh your-domain.com deploy
 ```
 
+If your app directory is not `/opt/midi-invaders`, pass it as the 3rd argument:
+
+```bash
+./ops/scripts/bootstrap-vm.sh your-domain.com deploy /home/tharinda/midi-invaders
+```
+
 Then create API env file:
 
 ```bash
@@ -83,7 +89,16 @@ If you want to deploy manually from the server:
 
 ```bash
 ssh deploy@your-server
-cd /opt/midi-invaders
+cd <deploy-path>
+git pull --ff-only
+./ops/scripts/manual-deploy-after-pull.sh
+```
+
+Example:
+
+```bash
+ssh tharinda@your-server
+cd /home/tharinda/midi-invaders
 git pull --ff-only
 ./ops/scripts/manual-deploy-after-pull.sh
 ```
@@ -96,6 +111,7 @@ The script performs:
 5. `sudo systemctl reload caddy`
 
 It loads API env from `/etc/midi-invaders/api.env` (preferred), or falls back to `apps/api/.env` if present.
+It also warns if `midi-invaders-api` or Caddy are still configured to serve from a different directory.
 
 ## 5) Health checks
 

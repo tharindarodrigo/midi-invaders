@@ -21,6 +21,23 @@ if ! command -v sudo >/dev/null 2>&1; then
   exit 1
 fi
 
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files midi-invaders-api.service >/dev/null 2>&1; then
+  SERVICE_WORKDIR="$(systemctl show -p WorkingDirectory --value midi-invaders-api 2>/dev/null || true)"
+  if [[ -n "${SERVICE_WORKDIR}" && "${SERVICE_WORKDIR}" != "${REPO_ROOT}" ]]; then
+    echo "[manual-deploy] Warning: midi-invaders-api service WorkingDirectory is ${SERVICE_WORKDIR}"
+    echo "[manual-deploy] Warning: current deploy directory is ${REPO_ROOT}"
+    echo "[manual-deploy] Warning: service may still run old code until WorkingDirectory is updated."
+  fi
+fi
+
+if [[ -f /etc/caddy/Caddyfile ]]; then
+  EXPECTED_WEB_ROOT="root * ${REPO_ROOT}/apps/web/dist"
+  if ! grep -Fq "${EXPECTED_WEB_ROOT}" /etc/caddy/Caddyfile; then
+    echo "[manual-deploy] Warning: /etc/caddy/Caddyfile does not contain: ${EXPECTED_WEB_ROOT}"
+    echo "[manual-deploy] Warning: Caddy may still be serving frontend from another directory."
+  fi
+fi
+
 if [[ -f "${API_ENV_FILE}" ]]; then
   echo "[manual-deploy] Loading API environment from ${API_ENV_FILE}"
   set -a
