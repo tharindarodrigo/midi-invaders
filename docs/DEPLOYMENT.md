@@ -62,8 +62,13 @@ Workflow file:
 Add repository secrets:
 - `DEPLOY_HOST`: VM public IP or hostname
 - `DEPLOY_USER`: SSH user on VM (example: `deploy`)
-- `DEPLOY_SSH_KEY`: private key content used by GitHub Actions
+- `DEPLOY_SSH_KEY`: private key content used by GitHub Actions (recommended)
+- `DEPLOY_PASSWORD`: SSH password (optional fallback if no key is configured)
 - `DEPLOY_PATH`: deploy directory on VM (example: `/opt/midi-invaders`)
+
+Notes:
+- Configure at least one authentication secret: `DEPLOY_SSH_KEY` or `DEPLOY_PASSWORD`.
+- If your deploy fails with `can't connect without a private SSH key or password`, the workflow now reports which secret is missing in the `Validate deploy secrets` step.
 
 The workflow does:
 1. Lint + test + build.
@@ -71,6 +76,24 @@ The workflow does:
 3. Install dependencies and build on VM.
 4. Run Prisma migrations.
 5. Restart API and reload Caddy.
+
+## 4.1) Manual deploy after SSH + git pull
+
+If you want to deploy manually from the server:
+
+```bash
+ssh deploy@your-server
+cd /opt/midi-invaders
+git pull --ff-only
+./ops/scripts/manual-deploy-after-pull.sh
+```
+
+The script performs:
+1. `pnpm install --frozen-lockfile`
+2. `pnpm -r build`
+3. `pnpm -C apps/api exec prisma migrate deploy`
+4. `sudo systemctl restart midi-invaders-api`
+5. `sudo systemctl reload caddy`
 
 ## 5) Health checks
 

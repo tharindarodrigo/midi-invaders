@@ -32,12 +32,37 @@ jobs:
           pnpm -r test
           pnpm -r build
 
+      - name: Validate deploy secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          missing=()
+          [[ -z "${DEPLOY_HOST}" ]] && missing+=("DEPLOY_HOST")
+          [[ -z "${DEPLOY_USER}" ]] && missing+=("DEPLOY_USER")
+          [[ -z "${DEPLOY_PATH}" ]] && missing+=("DEPLOY_PATH")
+
+          if [[ -z "${DEPLOY_SSH_KEY}" && -z "${DEPLOY_PASSWORD}" ]]; then
+            missing+=("DEPLOY_SSH_KEY or DEPLOY_PASSWORD")
+          fi
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing required deploy secret(s): ${missing[*]}"
+            exit 1
+          fi
+
       - name: Upload code to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
           source: "."
           target: ${{ secrets.DEPLOY_PATH }}
           strip_components: 0
@@ -48,6 +73,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"
