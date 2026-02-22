@@ -1,5 +1,12 @@
 import type { ArenaConfig, DifficultyLevel } from '@/types/gameplay';
 
+const NOTE_POOL_START = 60; // C4
+const NOTE_POOL_END = 83; // B5
+const NOTE_POOL = Array.from(
+  { length: NOTE_POOL_END - NOTE_POOL_START + 1 },
+  (_, index) => NOTE_POOL_START + index,
+);
+
 export const createArenaConfig = (
   width = 720,
   height = 540,
@@ -42,7 +49,7 @@ export const createArenaConfig = (
     centerY,
     coreRadius: 58,
     spawnRadius,
-    notePool: [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71],
+    notePool: NOTE_POOL,
     startingLives: 3,
     basePoints: 100,
     baseSpawnIntervalMs: preset.baseSpawnIntervalMs,

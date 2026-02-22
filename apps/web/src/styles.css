@@ -113,8 +113,9 @@ button:disabled {
 .game-canvas {
   border: 1px solid #334155;
   border-radius: 12px;
-  overflow: hidden;
-  min-height: 760px;
+  overflow: auto;
+  min-height: 1080px;
+  min-width: 1080px;
 }
 
 @media (max-width: 900px) {
@@ -123,6 +124,7 @@ button:disabled {
   }
 
   .game-canvas {
-    min-height: 540px;
+    min-height: 760px;
+    min-width: 760px;
   }
 }

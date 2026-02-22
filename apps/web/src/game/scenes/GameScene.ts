@@ -2,13 +2,25 @@ import Phaser from 'phaser';
 import { createArenaConfig } from '@/game/arenaConfig';
 import { gameBridge } from '@/game/gameBridge';
 import { GameStateSystem } from '@/game/systems/gameStateSystem';
-import { noteNumberToName } from '@/services/note';
+import { renderStaffNoteToCanvas } from '@/services/notation';
 import type { DifficultyLevel } from '@/types/gameplay';
 import type { InputNoteEvent } from '@/types/input';
 
 interface InvaderView {
   container: Phaser.GameObjects.Container;
 }
+
+const NOTATION_TEXTURE_WIDTH = 220;
+const NOTATION_TEXTURE_HEIGHT = 160;
+const NOTATION_TEXTURE_VERSION = 'v6-stem-direction';
+const NOTATION_SCALE = 1.2;
+const NOTATION_BASE_DISPLAY_WIDTH = 160;
+const NOTATION_BASE_DISPLAY_HEIGHT = 122;
+const NOTATION_DISPLAY_WIDTH = Math.round(NOTATION_BASE_DISPLAY_WIDTH * NOTATION_SCALE);
+const NOTATION_DISPLAY_HEIGHT = Math.round(NOTATION_BASE_DISPLAY_HEIGHT * NOTATION_SCALE);
+const INVADER_FRAME_WIDTH = NOTATION_DISPLAY_WIDTH + 20;
+const INVADER_FRAME_HEIGHT = NOTATION_DISPLAY_HEIGHT + 30;
+const NOTATION_VERTICAL_OFFSET = -Math.round(INVADER_FRAME_HEIGHT * 0.15);
 
 export class GameScene extends Phaser.Scene {
   private arenaConfig = createArenaConfig();
@@ -27,6 +39,7 @@ export class GameScene extends Phaser.Scene {
     const difficulty = data.difficulty ?? 1;
     this.arenaConfig = createArenaConfig(this.scale.width, this.scale.height, difficulty);
     this.cameras.main.setBackgroundColor('#030712');
+    this.cameras.main.roundPixels = true;
     this.gameState = new GameStateSystem(this.arenaConfig);
     this.gameState.reset(this.time.now);
     this.isEnding = false;
@@ -82,7 +95,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
 
-      view.container.setPosition(invader.x, invader.y);
+      view.container.setPosition(Math.round(invader.x), Math.round(invader.y));
     }
 
     if (step.gameOver) {
@@ -146,59 +159,46 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderInvader(id: string, note: number, x: number, y: number): void {
-    const noteName = noteNumberToName(note);
-    const hasSharp = noteName.includes('#');
-    const noteIndex = note % 12;
-    const noteStepOffsets = [0, 0, -8, -8, -16, -16, -24, -24, -32, -32, -40, -40];
-    const noteY = noteStepOffsets[noteIndex];
+    const notationTextureKey = this.ensureNotationTexture(note);
 
-    const parts: Phaser.GameObjects.GameObject[] = [];
+    const halo = this.add.circle(0, 0, 98, 0x22d3ee, 0.1);
+    const notationFrame = this.add.rectangle(0, 0, INVADER_FRAME_WIDTH, INVADER_FRAME_HEIGHT, 0x020617, 0.8);
+    notationFrame.setStrokeStyle(2, 0x22d3ee, 0.9);
 
-    for (let i = 0; i < 5; i += 1) {
-      const yOffset = -20 + i * 10;
-      const line = this.add.rectangle(0, yOffset, 64, 1.6, 0x93c5fd, 0.45);
-      parts.push(line);
+    const notationSprite = this.add.image(
+      0,
+      NOTATION_VERTICAL_OFFSET,
+      notationTextureKey === '__MISSING' ? '__WHITE' : notationTextureKey,
+    );
+    if (notationTextureKey === '__MISSING') {
+      notationSprite.setTint(0x94a3b8);
     }
+    notationSprite.setDisplaySize(NOTATION_DISPLAY_WIDTH, NOTATION_DISPLAY_HEIGHT);
 
-    const noteHead = this.add.ellipse(0, noteY, 16, 12, 0xf8fafc, 0.95);
-    const stem = this.add.rectangle(8, noteY - 11, 2, 24, 0xf8fafc, 0.95);
-    parts.push(noteHead, stem);
-
-    if (hasSharp) {
-      const accidental = this.add
-        .text(-16, noteY - 6, '#', {
-          color: '#fde68a',
-          fontSize: '14px',
-          fontFamily: 'monospace',
-          fontStyle: 'bold',
-        })
-        .setOrigin(0.5);
-      parts.push(accidental);
-    }
-
-    const glow = this.add.circle(0, 0, 36, 0x38bdf8, 0.12);
-    parts.push(glow);
-
-    const label = this.add
-      .text(0, 28, noteName, {
-        color: '#e2e8f0',
-        fontSize: '12px',
-        fontFamily: 'monospace',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-    parts.push(label);
-
-    const container = this.add.container(x, y, parts);
+    const container = this.add.container(x, y, [halo, notationFrame, notationSprite]);
     this.invaderViews.set(id, { container });
+  }
 
-    this.tweens.add({
-      targets: container,
-      scaleX: { from: 0.9, to: 1 },
-      scaleY: { from: 0.9, to: 1 },
-      duration: 180,
-      ease: 'Quad.Out',
-    });
+  private ensureNotationTexture(note: number): string {
+    const textureKey = `staff-note-${NOTATION_TEXTURE_VERSION}-${note}`;
+    if (this.textures.exists(textureKey)) {
+      return textureKey;
+    }
+
+    const canvasTexture = this.textures.createCanvas(
+      textureKey,
+      NOTATION_TEXTURE_WIDTH,
+      NOTATION_TEXTURE_HEIGHT,
+    );
+    if (!canvasTexture) {
+      return '__MISSING';
+    }
+
+    const canvas = canvasTexture.getCanvas();
+    renderStaffNoteToCanvas(canvas, note, { clef: 'treble' });
+    canvasTexture.refresh();
+
+    return textureKey;
   }
 
   private renderLaser(id: string, fromX: number, fromY: number, toX: number, toY: number): void {
