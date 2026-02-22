@@ -1,0 +1,11 @@
+node_modules
+.pnpm-store
+coverage
+dist
+.env
+.env.*
+!.env.example
+!apps/api/.env.example
+*.log
+.DS_Store
+apps/api/dev.db
