@@ -4,6 +4,7 @@ import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 
 interface HudOverlayProps {
+  selectedInputMode: 'keyboard' | 'midi';
   midiSupported: boolean;
   midiStatus: 'idle' | 'connecting' | 'ready' | 'error';
   midiError: string | null;
@@ -12,6 +13,7 @@ interface HudOverlayProps {
   selectedDifficulty: DifficultyLevel;
   noteHistory: InputNoteEvent[];
   hud: HudState;
+  onSelectInputMode: (mode: 'keyboard' | 'midi') => void;
   onConnectMidi: () => void;
   onSelectMidiInput: (inputId: string) => void;
   onSelectDifficulty: (difficulty: DifficultyLevel) => void;
@@ -38,6 +40,7 @@ const statusLabel = (status: HudOverlayProps['midiStatus']): string => {
 };
 
 export function HudOverlay({
+  selectedInputMode,
   midiSupported,
   midiStatus,
   midiError,
@@ -46,6 +49,7 @@ export function HudOverlay({
   selectedDifficulty,
   noteHistory,
   hud,
+  onSelectInputMode,
   onConnectMidi,
   onSelectMidiInput,
   onSelectDifficulty,
@@ -57,31 +61,55 @@ export function HudOverlay({
   return (
     <aside className="hud-panel">
       <h1>MIDI Invaders</h1>
-      <p className="status">MIDI: {midiSupported ? statusLabel(midiStatus) : 'Not available'}</p>
-      {midiSupported ? (
+      <label className="input-label" htmlFor="input-mode">
+        Input Mode
+      </label>
+      <select
+        id="input-mode"
+        className="device-select"
+        value={selectedInputMode}
+        onChange={(event) => onSelectInputMode(event.target.value as 'keyboard' | 'midi')}
+      >
+        <option value="keyboard">Computer Keyboard</option>
+        <option value="midi">MIDI Keyboard</option>
+      </select>
+
+      {selectedInputMode === 'midi' ? (
         <>
-          <button onClick={onConnectMidi} disabled={midiStatus === 'connecting'}>
-            {midiStatus === 'ready' ? 'Reconnect MIDI' : 'Connect MIDI'}
-          </button>
-          <label className="input-label" htmlFor="midi-input">
-            Input Device
-          </label>
-          <select
-            id="midi-input"
-            className="device-select"
-            value={selectedInputId ?? ''}
-            onChange={(event) => onSelectMidiInput(event.target.value)}
-          >
-            <option value="">Select input</option>
-            {midiDevices.map((device) => (
-              <option key={device.id} value={device.id}>
-                {device.name} ({device.manufacturer})
-              </option>
-            ))}
-          </select>
-          {midiError ? <p className="error">{midiError}</p> : null}
+          <p className="status">MIDI: {midiSupported ? statusLabel(midiStatus) : 'Not available'}</p>
+          {midiSupported ? (
+            <>
+              <button onClick={onConnectMidi} disabled={midiStatus === 'connecting'}>
+                {midiStatus === 'ready' ? 'Reconnect MIDI' : 'Connect MIDI'}
+              </button>
+              <label className="input-label" htmlFor="midi-input">
+                Input Device
+              </label>
+              <select
+                id="midi-input"
+                className="device-select"
+                value={selectedInputId ?? ''}
+                onChange={(event) => onSelectMidiInput(event.target.value)}
+              >
+                <option value="">Select input</option>
+                {midiDevices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name} ({device.manufacturer})
+                  </option>
+                ))}
+              </select>
+              {midiError ? <p className="error">{midiError}</p> : null}
+            </>
+          ) : (
+            <p className="error">Web MIDI is unavailable in this browser. Switch to Computer Keyboard mode.</p>
+          )}
         </>
-      ) : null}
+      ) : (
+        <>
+          <p className="status">Keyboard mode ready</p>
+          <p>Use the on-canvas key map to play from C4 to B5.</p>
+        </>
+      )}
 
       <label className="input-label" htmlFor="difficulty-level">
         Difficulty

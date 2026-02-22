@@ -10,9 +10,15 @@ interface InvaderView {
   container: Phaser.GameObjects.Container;
 }
 
+interface LaserView {
+  glow: Phaser.GameObjects.Line;
+  core: Phaser.GameObjects.Line;
+  muzzleFlash: Phaser.GameObjects.Arc;
+}
+
 const NOTATION_TEXTURE_WIDTH = 220;
 const NOTATION_TEXTURE_HEIGHT = 160;
-const NOTATION_TEXTURE_VERSION = 'v6-stem-direction';
+const NOTATION_TEXTURE_VERSION = 'v7-stem-direction-middle-line';
 const NOTATION_SCALE = 1.2;
 const NOTATION_BASE_DISPLAY_WIDTH = 160;
 const NOTATION_BASE_DISPLAY_HEIGHT = 122;
@@ -24,12 +30,14 @@ const NOTATION_VERTICAL_OFFSET = -Math.round(INVADER_FRAME_HEIGHT * 0.15);
 const SCORE_POPUP_DURATION_MS = 620;
 const SCORE_POPUP_RISE_PX = 54;
 const MISS_FREEZE_MS = 1000;
+const LASER_TRAVEL_DURATION_MS = 85;
+const LASER_FADE_DURATION_MS = 35;
 
 export class GameScene extends Phaser.Scene {
   private arenaConfig = createArenaConfig();
   private gameState!: GameStateSystem;
   private readonly invaderViews = new Map<string, InvaderView>();
-  private readonly laserViews = new Map<string, Phaser.GameObjects.Line>();
+  private readonly laserViews = new Map<string, LaserView>();
   private unsubscribeCommand?: () => void;
   private unsubscribeInput?: () => void;
   private isEnding = false;
@@ -142,14 +150,29 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const hitX = result.target?.x;
+    const hitY = result.target?.y;
+
     if (result.target) {
-      this.playHitFlash(result.target.x, result.target.y);
       this.playScorePopup(result.target.x, result.target.y, result.scoreDelta);
       this.destroyInvaderView(result.target.id);
     }
 
     if (result.laser) {
-      this.renderLaser(result.laser.id, result.laser.fromX, result.laser.fromY, result.laser.toX, result.laser.toY);
+      this.renderLaser(
+        result.laser.id,
+        result.laser.fromX,
+        result.laser.fromY,
+        result.laser.toX,
+        result.laser.toY,
+        () => {
+          if (hitX !== undefined && hitY !== undefined) {
+            this.playHitFlash(hitX, hitY);
+          }
+        },
+      );
+    } else if (hitX !== undefined && hitY !== undefined) {
+      this.playHitFlash(hitX, hitY);
     }
 
     this.publishHud();
@@ -220,18 +243,84 @@ export class GameScene extends Phaser.Scene {
     return textureKey;
   }
 
-  private renderLaser(id: string, fromX: number, fromY: number, toX: number, toY: number): void {
-    const line = this.add.line(0, 0, fromX, fromY, toX, toY, 0x22d3ee, 1).setOrigin(0, 0);
-    line.setLineWidth(2, 5);
-    line.setBlendMode(Phaser.BlendModes.ADD);
+  private renderLaser(
+    id: string,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    onImpact?: () => void,
+  ): void {
+    const glow = this.add.line(0, 0, fromX, fromY, fromX, fromY, 0xff3040, 0.86).setOrigin(0, 0);
+    glow.setLineWidth(16, 1.8);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    glow.setDepth(9);
 
-    this.laserViews.set(id, line);
+    const core = this.add.line(0, 0, fromX, fromY, fromX, fromY, 0xfff3e8, 0.98).setOrigin(0, 0);
+    core.setLineWidth(6, 1.2);
+    core.setBlendMode(Phaser.BlendModes.ADD);
+    core.setDepth(10);
+
+    const muzzleFlash = this.add.circle(fromX, fromY, 8, 0xff6b6b, 0.96);
+    muzzleFlash.setBlendMode(Phaser.BlendModes.ADD);
+    muzzleFlash.setDepth(11);
+
+    this.laserViews.set(id, { glow, core, muzzleFlash });
+
+    const distance = Math.hypot(toX - fromX, toY - fromY) || 1;
+    const directionX = (toX - fromX) / distance;
+    const directionY = (toY - fromY) / distance;
+    const glowTrailLength = Math.min(94, Math.max(30, distance * 0.32));
+    const coreTrailLength = Math.min(58, Math.max(18, distance * 0.22));
+    const travelState = { progress: 0 };
+
+    const updateBeam = (progress: number): void => {
+      const clamped = Phaser.Math.Clamp(progress, 0, 1);
+      const headX = Phaser.Math.Linear(fromX, toX, clamped);
+      const headY = Phaser.Math.Linear(fromY, toY, clamped);
+      const travelledDistance = distance * clamped;
+      const currentGlowTrail = Math.min(glowTrailLength, travelledDistance);
+      const currentCoreTrail = Math.min(coreTrailLength, travelledDistance);
+      const glowTailX = headX - directionX * currentGlowTrail;
+      const glowTailY = headY - directionY * currentGlowTrail;
+      const coreTailX = headX - directionX * currentCoreTrail;
+      const coreTailY = headY - directionY * currentCoreTrail;
+
+      glow.setTo(glowTailX, glowTailY, headX, headY);
+      core.setTo(coreTailX, coreTailY, headX, headY);
+
+      const glowStrength = 0.9 - clamped * 0.5;
+      const coreStrength = 1 - clamped * 0.36;
+      glow.setAlpha(Math.max(0.24, glowStrength));
+      core.setAlpha(Math.max(0.42, coreStrength));
+    };
+
+    updateBeam(0);
 
     this.tweens.add({
-      targets: line,
+      targets: travelState,
+      progress: 1,
+      duration: LASER_TRAVEL_DURATION_MS,
+      ease: 'Cubic.Out',
+      onUpdate: () => updateBeam(travelState.progress),
+      onComplete: () => {
+        onImpact?.();
+        this.tweens.add({
+          targets: [glow, core],
+          alpha: 0,
+          duration: LASER_FADE_DURATION_MS,
+          ease: 'Quad.Out',
+        });
+      },
+    });
+
+    this.tweens.add({
+      targets: muzzleFlash,
       alpha: 0,
-      duration: 120,
-      ease: 'Linear',
+      scaleX: 1.9,
+      scaleY: 1.9,
+      duration: LASER_TRAVEL_DURATION_MS + LASER_FADE_DURATION_MS,
+      ease: 'Cubic.Out',
     });
   }
 
@@ -246,12 +335,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private destroyLaserView(laserId: string): void {
-    const line = this.laserViews.get(laserId);
-    if (!line) {
+    const view = this.laserViews.get(laserId);
+    if (!view) {
       return;
     }
 
-    line.destroy();
+    view.glow.destroy();
+    view.core.destroy();
+    view.muzzleFlash.destroy();
     this.laserViews.delete(laserId);
   }
 

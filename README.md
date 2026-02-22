@@ -29,6 +29,9 @@
 - Successful hits now show a floating `+points` popup near the destroyed invader.
 - Difficulty level 1 now starts with one incoming invader and ramps up by wave.
 - Wrong notes now apply a `-50` score penalty, show a floating penalty popup, and freeze gameplay for 1 second.
+- Treble staff stems now point downward for notes above the center line.
+- Laser shots now fire as directional red blaster bursts that impact the target, then fade in glow strength.
+- Input mode can now be switched between `Computer Keyboard` and `MIDI Keyboard` from the HUD and start-canvas overlay.
 
 ### Validation commands
 - `pnpm -r lint`
@@ -100,8 +103,12 @@ The game starts as **single-note matching**, then ramps into **intervals, chords
 
 **Computer keyboard fallback**
 
-* Map keys to a limited octave (e.g., A/W/S/E/D/F/T/G/Y/H/U/J).
-* Allow transpose and octave shift.
+* Default mapping supports two octaves:
+  * C4 white notes: `Z X C V B N M`
+  * C4 black notes: `S D G H J`
+  * C5 white notes: `W E R T Y U I`
+  * C5 black notes: `2 3 5 6 7`
+* Allow transpose and octave shift (future setting).
 
 **Calibration & settings**
 

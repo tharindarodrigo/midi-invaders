@@ -1,9 +1,16 @@
 import { Accidental, Formatter, Renderer, Stave, StaveNote } from 'vexflow';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
-const STEM_DOWN_FROM_MIDI = 83; // B5
+const TREBLE_CENTER_LINE_MIDI = 71; // B4
+const BASS_CENTER_LINE_MIDI = 50; // D3
 
-const getStemDirection = (midiNote: number): 1 | -1 => (midiNote >= STEM_DOWN_FROM_MIDI ? -1 : 1);
+export const getStemDirectionForMidi = (
+  midiNote: number,
+  clef: 'treble' | 'bass' = 'treble',
+): 1 | -1 => {
+  const centerLineMidi = clef === 'bass' ? BASS_CENTER_LINE_MIDI : TREBLE_CENTER_LINE_MIDI;
+  return midiNote > centerLineMidi ? -1 : 1;
+};
 
 const midiToPitch = (midiNote: number): { letter: string; accidental: string; octave: number } => {
   const noteName = NOTE_NAMES[((midiNote % 12) + 12) % 12];
@@ -51,14 +58,15 @@ export const renderStaffNoteToCanvas = (
   stave.draw();
 
   const vexKey = midiToVexKey(midiNote);
+  const stemDirection = getStemDirectionForMidi(midiNote, clef);
   const note = new StaveNote({
     keys: [vexKey],
     duration: 'q',
     clef,
     autoStem: false,
-    stemDirection: getStemDirection(midiNote),
+    stemDirection,
   });
-  note.setStemDirection(getStemDirection(midiNote));
+  note.setStemDirection(stemDirection);
   note.setStyle({
     fillStyle: noteColor,
     strokeStyle: noteColor,

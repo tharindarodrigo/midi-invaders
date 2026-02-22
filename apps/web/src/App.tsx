@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createGameConfig } from '@/game/config';
 import { gameBridge } from '@/game/gameBridge';
+import { canStartWithInputMode, shouldProcessInputEvent } from '@/services/inputMode';
 import { bindKeyboardFallback } from '@/services/keyboardFallback';
 import { MidiService, supportsWebMidi } from '@/services/midi';
 import { getStoredMidiInputId, setStoredMidiInputId } from '@/services/midiPreferences';
@@ -33,11 +34,18 @@ export default function App() {
   const [midiError, setMidiError] = useState<string | null>(null);
   const [midiDevices, setMidiDevices] = useState<MidiInputDevice[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
+  const [selectedInputMode, setSelectedInputMode] = useState<'keyboard' | 'midi'>('keyboard');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(1);
   const [noteHistory, setNoteHistory] = useState<InputNoteEvent[]>([]);
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
+  const selectedInputModeRef = useRef<'keyboard' | 'midi'>('keyboard');
+  const selectedMidiInputIdRef = useRef<string | null>(null);
 
   const handleInputEvent = useCallback((event: InputNoteEvent) => {
+    if (!shouldProcessInputEvent(selectedInputModeRef.current, selectedMidiInputIdRef.current, event)) {
+      return;
+    }
+
     setNoteHistory((previous) => [event, ...previous].slice(0, MAX_NOTE_HISTORY));
     gameBridge.publishInput(event);
   }, []);
@@ -92,6 +100,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    selectedInputModeRef.current = selectedInputMode;
+    setNoteHistory([]);
+  }, [selectedInputMode]);
+
+  useEffect(() => {
+    selectedMidiInputIdRef.current = selectedInputId;
+  }, [selectedInputId]);
+
+  useEffect(() => {
     const config = createGameConfig(containerId);
     gameRef.current = new Phaser.Game(config);
 
@@ -138,7 +155,8 @@ export default function App() {
     void connectMidi();
   }, [connectMidi]);
 
-  const canStartGame = midiStatus === 'ready' && selectedInputId !== null;
+  const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId);
+  const selectedInputModeLabel = selectedInputMode === 'keyboard' ? 'Computer Keyboard' : 'MIDI Keyboard';
 
   return (
     <main className="app-root">
@@ -165,7 +183,7 @@ export default function App() {
             className="hero-button ghost"
             onClick={() => canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
-            Setup MIDI
+            Setup Inputs
           </button>
         </div>
         <div className="hero-tags" aria-label="Feature highlights">
@@ -178,6 +196,7 @@ export default function App() {
 
       <section className="play-shell" aria-label="Play MIDI Invaders">
         <HudOverlay
+          selectedInputMode={selectedInputMode}
           midiSupported={midiSupported}
           midiStatus={midiStatus}
           midiError={midiError}
@@ -186,6 +205,7 @@ export default function App() {
           selectedDifficulty={selectedDifficulty}
           noteHistory={noteHistory}
           hud={hud}
+          onSelectInputMode={setSelectedInputMode}
           onConnectMidi={connectMidi}
           onSelectMidiInput={handleSelectMidiInput}
           onSelectDifficulty={setSelectedDifficulty}
@@ -210,7 +230,30 @@ export default function App() {
           {hud.scene !== 'game' && hud.scene !== 'game-over' ? (
             <div className="game-instructions" aria-label="How to play">
               <h2>Play by matching the note shown above each invader</h2>
-              <p>Connect your MIDI keyboard, pick your device, then press Play. Hit matching notes before invaders reach the core.</p>
+              <p>
+                Input Mode: <strong>{selectedInputModeLabel}</strong>. Choose mode below, then press Play.
+              </p>
+              <div className="start-mode-switch" aria-label="Input mode switch">
+                <button
+                  className={`start-mode-button ${selectedInputMode === 'keyboard' ? 'active' : ''}`}
+                  onClick={() => setSelectedInputMode('keyboard')}
+                  type="button"
+                >
+                  Computer Keyboard
+                </button>
+                <button
+                  className={`start-mode-button ${selectedInputMode === 'midi' ? 'active' : ''}`}
+                  onClick={() => setSelectedInputMode('midi')}
+                  type="button"
+                >
+                  MIDI Keyboard
+                </button>
+              </div>
+              <p>
+                {selectedInputMode === 'keyboard'
+                  ? 'Keyboard mode is ready now. Use the key map below to play without a MIDI device.'
+                  : 'MIDI mode requires a connected MIDI input device.'}
+              </p>
               <svg className="keyboard-svg" viewBox="0 0 420 126" role="img" aria-label="Keyboard guide">
                 <rect x="0" y="0" width="420" height="126" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
                 <g fill="#f8fafc" stroke="#0f172a" strokeWidth="1.5">
@@ -232,7 +275,9 @@ export default function App() {
                   <rect x="255" y="12" width="26" height="58" rx="3" />
                   <rect x="339" y="12" width="26" height="58" rx="3" />
                 </g>
-                <text x="24" y="120" fill="#e2e8f0" fontSize="12">Tip: C4 is MIDI 60. Match note names exactly.</text>
+                <text x="24" y="120" fill="#e2e8f0" fontSize="12">
+                  Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 2 3 5 6 7)
+                </text>
               </svg>
               <button
                 className="game-start-button"

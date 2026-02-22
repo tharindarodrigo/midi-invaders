@@ -1,18 +1,34 @@
 import type { InputNoteEvent } from '@/types/input';
 
 export const KEYBOARD_NOTE_MAP: Record<string, number> = {
-  a: 60,
-  w: 61,
-  s: 62,
-  e: 63,
-  d: 64,
-  f: 65,
-  t: 66,
-  g: 67,
-  y: 68,
-  h: 69,
-  u: 70,
-  j: 71,
+  // C4 octave white keys
+  z: 60, // C4
+  x: 62, // D4
+  c: 64, // E4
+  v: 65, // F4
+  b: 67, // G4
+  n: 69, // A4
+  m: 71, // B4
+  // C4 octave black keys
+  s: 61, // C#4
+  d: 63, // D#4
+  g: 66, // F#4
+  h: 68, // G#4
+  j: 70, // A#4
+  // C5 octave white keys
+  w: 72, // C5
+  e: 74, // D5
+  r: 76, // E5
+  t: 77, // F5
+  y: 79, // G5
+  u: 81, // A5
+  i: 83, // B5
+  // C5 octave black keys
+  '2': 73, // C#5
+  '3': 75, // D#5
+  '5': 78, // F#5
+  '6': 80, // G#5
+  '7': 82, // A#5
 };
 
 export const createKeyboardFallbackHandler = (
@@ -73,6 +89,8 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
       return;
     }
 
+    event.preventDefault();
+
     if (activeKeys.has(key)) {
       return;
     }
@@ -88,6 +106,8 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
     if (typeof note !== 'number') {
       return;
     }
+
+    event.preventDefault();
 
     activeKeys.delete(key);
     onNoteEvent(toNoteEvent('note_off', note, key, event.timeStamp));

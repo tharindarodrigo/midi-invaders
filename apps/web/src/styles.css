@@ -296,6 +296,26 @@ button:disabled {
   line-height: 1.5;
 }
 
+.start-mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.start-mode-button {
+  min-width: 190px;
+  border: 1px solid rgb(34 211 238 / 45%);
+  background: rgb(15 23 42 / 64%);
+  color: #e2e8f0;
+}
+
+.start-mode-button.active {
+  border-color: rgb(244 63 94 / 80%);
+  background: linear-gradient(135deg, #fb7185 0%, #f43f5e 52%, #be123c 100%);
+  color: #fff7ed;
+}
+
 .game-results {
   gap: 8px;
 }
