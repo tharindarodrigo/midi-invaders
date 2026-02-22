@@ -95,6 +95,8 @@ The script performs:
 4. `sudo systemctl restart midi-invaders-api`
 5. `sudo systemctl reload caddy`
 
+It loads API env from `/etc/midi-invaders/api.env` (preferred), or falls back to `apps/api/.env` if present.
+
 ## 5) Health checks
 
 After deploy:
