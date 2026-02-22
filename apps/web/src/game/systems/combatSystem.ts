@@ -1,12 +1,4 @@
-import type { ArenaConfig, ArenaState, LaserShot } from '@/types/gameplay';
-
-export const isWeaponCoolingDown = (state: ArenaState, now: number): boolean => {
-  return now < state.weaponCooldownUntil;
-};
-
-export const applyMissCooldown = (state: ArenaState, config: ArenaConfig, now: number): void => {
-  state.weaponCooldownUntil = Math.max(state.weaponCooldownUntil, now + config.missCooldownMs);
-};
+import type { ArenaConfig, LaserShot } from '@/types/gameplay';
 
 export const createLaserShot = (args: {
   id: string;

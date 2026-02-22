@@ -47,8 +47,8 @@ describe('radial spawner', () => {
   it('applies wave scaling and spawn floor correctly', () => {
     const config = createArenaConfig();
 
-    expect(computeMaxInvaders(config, 1)).toBe(4);
-    expect(computeMaxInvaders(config, 4)).toBe(7);
+    expect(computeMaxInvaders(config, 1)).toBe(1);
+    expect(computeMaxInvaders(config, 4)).toBe(4);
 
     const wave1 = computeSpawnIntervalMs(config, 1);
     const wave20 = computeSpawnIntervalMs(config, 20);

@@ -26,6 +26,9 @@
 ### UX notes
 - The game canvas now shows a keyboard SVG and quick instructions before gameplay starts.
 - The selected MIDI input is stored and automatically reselected after reload when that device is still connected.
+- Successful hits now show a floating `+points` popup near the destroyed invader.
+- Difficulty level 1 now starts with one incoming invader and ramps up by wave.
+- Wrong notes now apply a `-50` score penalty, show a floating penalty popup, and freeze gameplay for 1 second.
 
 ### Validation commands
 - `pnpm -r lint`

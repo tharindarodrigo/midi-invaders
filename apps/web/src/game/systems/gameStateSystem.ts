@@ -5,7 +5,7 @@ import type {
   InvaderEntity,
   NoteProcessResult,
 } from '@/types/gameplay';
-import { applyMissCooldown, createLaserShot, isWeaponCoolingDown } from '@/game/systems/combatSystem';
+import { createLaserShot } from '@/game/systems/combatSystem';
 import {
   buildRadialInvader,
   computeMaxInvaders,
@@ -14,13 +14,14 @@ import {
 } from '@/game/systems/radialSpawner';
 import { resolveNearestThreatTarget } from '@/game/systems/targetResolver';
 
+const MISS_PENALTY_POINTS = 50;
+
 const createInitialState = (config: ArenaConfig): ArenaState => ({
   score: 0,
   wave: 1,
   lives: config.startingLives,
   gameOver: false,
   hitsThisWave: 0,
-  weaponCooldownUntil: 0,
   invaders: [],
   lasers: [],
 });
@@ -68,19 +69,11 @@ export class GameStateSystem {
   processNote(note: number, now: number): NoteProcessResult {
     if (this.state.gameOver) {
       return {
-        kind: 'cooldown',
+        kind: 'ignored',
         target: null,
         laser: null,
         waveAdvanced: false,
-      };
-    }
-
-    if (isWeaponCoolingDown(this.state, now)) {
-      return {
-        kind: 'cooldown',
-        target: null,
-        laser: null,
-        waveAdvanced: false,
+        scoreDelta: 0,
       };
     }
 
@@ -92,18 +85,20 @@ export class GameStateSystem {
     });
 
     if (!resolution.matched || !resolution.target) {
-      applyMissCooldown(this.state, this.config, now);
+      this.state.score -= MISS_PENALTY_POINTS;
       return {
         kind: 'miss',
         target: null,
         laser: null,
         waveAdvanced: false,
+        scoreDelta: -MISS_PENALTY_POINTS,
       };
     }
 
     const target = resolution.target;
     this.state.invaders = this.state.invaders.filter((invader) => invader.id !== target.id);
-    this.state.score += this.config.basePoints;
+    const scoreDelta = this.config.basePoints;
+    this.state.score += scoreDelta;
 
     this.state.hitsThisWave += 1;
     let waveAdvanced = false;
@@ -129,7 +124,19 @@ export class GameStateSystem {
       target,
       laser,
       waveAdvanced,
+      scoreDelta,
     };
+  }
+
+  delayTimersForFreeze(durationMs: number): void {
+    if (durationMs <= 0) {
+      return;
+    }
+
+    this.nextSpawnAt += durationMs;
+    for (const laser of this.state.lasers) {
+      laser.expiresAt += durationMs;
+    }
   }
 
   step(now: number, deltaMs: number): ArenaStepResult {

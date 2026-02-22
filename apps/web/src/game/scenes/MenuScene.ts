@@ -25,7 +25,6 @@ export class MenuScene extends Phaser.Scene {
       score: 0,
       lives: 3,
       wave: 1,
-      weaponCooldownMs: 0,
       activeInvaders: 0,
       scene: 'menu',
     });

@@ -17,7 +17,6 @@ export interface ArenaConfig {
   invaderSpeedGrowth: number;
   baseMaxInvaders: number;
   laserLifetimeMs: number;
-  missCooldownMs: number;
 }
 
 export interface InvaderEntity {
@@ -47,7 +46,6 @@ export interface ArenaState {
   lives: number;
   gameOver: boolean;
   hitsThisWave: number;
-  weaponCooldownUntil: number;
   invaders: InvaderEntity[];
   lasers: LaserShot[];
 }
@@ -58,10 +56,11 @@ export interface TargetResolution {
 }
 
 export interface NoteProcessResult {
-  kind: 'hit' | 'miss' | 'cooldown';
+  kind: 'hit' | 'miss' | 'ignored';
   target: InvaderEntity | null;
   laser: LaserShot | null;
   waveAdvanced: boolean;
+  scoreDelta: number;
 }
 
 export interface ArenaStepResult {

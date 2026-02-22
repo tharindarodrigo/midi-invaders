@@ -104,7 +104,7 @@ export function HudOverlay({
       <p>Score: {hud.score}</p>
       <p>Lives: {hud.lives}</p>
       <p>Invaders: {hud.activeInvaders}</p>
-      <p>Cooldown: {hud.weaponCooldownMs}ms</p>
+      <p>Miss penalty: -50 points + 1s freeze</p>
 
       <h2 className="subheading">Recent Notes</h2>
       <ul className="note-list">

@@ -21,6 +21,9 @@ const NOTATION_DISPLAY_HEIGHT = Math.round(NOTATION_BASE_DISPLAY_HEIGHT * NOTATI
 const INVADER_FRAME_WIDTH = NOTATION_DISPLAY_WIDTH + 20;
 const INVADER_FRAME_HEIGHT = NOTATION_DISPLAY_HEIGHT + 30;
 const NOTATION_VERTICAL_OFFSET = -Math.round(INVADER_FRAME_HEIGHT * 0.15);
+const SCORE_POPUP_DURATION_MS = 620;
+const SCORE_POPUP_RISE_PX = 54;
+const MISS_FREEZE_MS = 1000;
 
 export class GameScene extends Phaser.Scene {
   private arenaConfig = createArenaConfig();
@@ -30,6 +33,8 @@ export class GameScene extends Phaser.Scene {
   private unsubscribeCommand?: () => void;
   private unsubscribeInput?: () => void;
   private isEnding = false;
+  private freezeUntil = 0;
+  private freezeDurationPendingMs = 0;
 
   constructor() {
     super('GameScene');
@@ -43,6 +48,8 @@ export class GameScene extends Phaser.Scene {
     this.gameState = new GameStateSystem(this.arenaConfig);
     this.gameState.reset(this.time.now);
     this.isEnding = false;
+    this.freezeUntil = 0;
+    this.freezeDurationPendingMs = 0;
 
     this.drawArena();
     this.renderInitialInvaders();
@@ -72,6 +79,13 @@ export class GameScene extends Phaser.Scene {
     if (this.isEnding) {
       return;
     }
+
+    if (time < this.freezeUntil) {
+      this.publishHud();
+      return;
+    }
+
+    this.applyPendingFreezeDelay();
 
     const step = this.gameState.step(time, delta);
 
@@ -107,25 +121,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleNoteOn(event: InputNoteEvent): void {
-    if (this.isEnding) {
+    if (this.isEnding || this.time.now < this.freezeUntil) {
       return;
     }
 
+    this.applyPendingFreezeDelay();
+
     const result = this.gameState.processNote(event.note, this.time.now);
 
-    if (result.kind === 'cooldown') {
+    if (result.kind === 'ignored') {
       this.publishHud();
       return;
     }
 
     if (result.kind === 'miss') {
       this.playMissPulse();
+      this.playScorePopup(this.arenaConfig.centerX, this.arenaConfig.centerY, result.scoreDelta);
+      this.freezeForMs(MISS_FREEZE_MS);
       this.publishHud();
       return;
     }
 
     if (result.target) {
       this.playHitFlash(result.target.x, result.target.y);
+      this.playScorePopup(result.target.x, result.target.y, result.scoreDelta);
       this.destroyInvaderView(result.target.id);
     }
 
@@ -278,13 +297,76 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private playScorePopup(x: number, y: number, scoreDelta: number): void {
+    if (scoreDelta === 0) {
+      return;
+    }
+
+    const isPenalty = scoreDelta < 0;
+    const text = scoreDelta > 0 ? `+${scoreDelta}` : `${scoreDelta}`;
+    const startY = y - 20;
+    const popup = this.add.text(x, startY, text, {
+      color: isPenalty ? '#fb7185' : '#facc15',
+      fontSize: '30px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      stroke: isPenalty ? '#4c0519' : '#7c2d12',
+      strokeThickness: 6,
+    });
+
+    popup.setOrigin(0.5);
+    popup.setDepth(20);
+    popup.setAlpha(0);
+    popup.setScale(0.72);
+
+    this.tweens.add({
+      targets: popup,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      y: isPenalty ? startY - 2 : startY - 10,
+      duration: 120,
+      ease: 'Back.Out',
+      onComplete: () => {
+        this.tweens.add({
+          targets: popup,
+          y: startY - (isPenalty ? SCORE_POPUP_RISE_PX - 12 : SCORE_POPUP_RISE_PX),
+          alpha: 0,
+          scaleX: 0.92,
+          scaleY: 0.92,
+          duration: SCORE_POPUP_DURATION_MS,
+          ease: 'Cubic.Out',
+          onComplete: () => popup.destroy(),
+        });
+      },
+    });
+  }
+
+  private freezeForMs(durationMs: number): void {
+    if (durationMs <= 0) {
+      return;
+    }
+
+    this.freezeUntil = this.time.now + durationMs;
+    this.freezeDurationPendingMs += durationMs;
+    this.cameras.main.shake(120, 0.0035, true);
+  }
+
+  private applyPendingFreezeDelay(): void {
+    if (this.freezeDurationPendingMs <= 0) {
+      return;
+    }
+
+    this.gameState.delayTimersForFreeze(this.freezeDurationPendingMs);
+    this.freezeDurationPendingMs = 0;
+  }
+
   private publishHud(): void {
     const state = this.gameState.getState();
     gameBridge.publishHud({
       score: state.score,
       lives: state.lives,
       wave: state.wave,
-      weaponCooldownMs: Math.max(0, Math.ceil(state.weaponCooldownUntil - this.time.now)),
       activeInvaders: state.invaders.length,
       scene: 'game',
     });

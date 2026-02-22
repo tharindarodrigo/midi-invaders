@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createArenaConfig } from '@/game/arenaConfig';
 
 describe('arena config difficulty presets', () => {
-  it('sets level 1 to very slow and fewer invaders', () => {
+  it('sets level 1 to very slow and starts with one invader', () => {
     const level1 = createArenaConfig(1200, 800, 1);
 
     expect(level1.baseInvaderSpeed).toBe(20);
-    expect(level1.baseMaxInvaders).toBe(4);
+    expect(level1.baseMaxInvaders).toBe(1);
     expect(level1.baseSpawnIntervalMs).toBe(2100);
   });
 

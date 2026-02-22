@@ -22,7 +22,7 @@ export const createArenaConfig = (
       spawnIntervalDecay: 0.985,
       baseInvaderSpeed: 20,
       invaderSpeedGrowth: 1.03,
-      baseMaxInvaders: 4,
+      baseMaxInvaders: 1,
     },
     2: {
       baseSpawnIntervalMs: 1550,
@@ -59,6 +59,5 @@ export const createArenaConfig = (
     invaderSpeedGrowth: preset.invaderSpeedGrowth,
     baseMaxInvaders: preset.baseMaxInvaders,
     laserLifetimeMs: 120,
-    missCooldownMs: 350,
   };
 };

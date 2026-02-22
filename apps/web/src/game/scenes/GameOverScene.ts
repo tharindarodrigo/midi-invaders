@@ -31,7 +31,6 @@ export class GameOverScene extends Phaser.Scene {
       score,
       lives: 0,
       wave: 0,
-      weaponCooldownMs: 0,
       activeInvaders: 0,
       scene: 'game-over',
     });
