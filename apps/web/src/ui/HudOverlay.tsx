@@ -15,6 +15,7 @@ interface HudOverlayProps {
   onConnectMidi: () => void;
   onSelectMidiInput: (inputId: string) => void;
   onSelectDifficulty: (difficulty: DifficultyLevel) => void;
+  canStart: boolean;
   onStart: () => void;
   onEnd: () => void;
   onRestart: () => void;
@@ -48,6 +49,7 @@ export function HudOverlay({
   onConnectMidi,
   onSelectMidiInput,
   onSelectDifficulty,
+  canStart,
   onStart,
   onEnd,
   onRestart,
@@ -115,7 +117,9 @@ export function HudOverlay({
       </ul>
 
       <div className="buttons">
-        <button onClick={onStart}>Start</button>
+        <button onClick={onStart} disabled={!canStart}>
+          Start
+        </button>
         <button onClick={onEnd}>End Game</button>
         <button onClick={onRestart}>Restart</button>
       </div>

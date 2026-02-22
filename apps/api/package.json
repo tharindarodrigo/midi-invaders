@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
     "prebuild": "prisma generate",
     "build": "tsc --noEmit",
     "lint": "eslint src test --ext .ts",

@@ -20,7 +20,12 @@
 2. Open the web client in a Chromium browser.
 3. In the HUD panel click `Connect MIDI`.
 4. Select the DGX-670 input from the device dropdown.
-5. Press notes and verify they appear in `Recent Notes`, then use `Start` to play.
+5. Use the large `Play` button shown over the game canvas to start.
+6. Press notes and verify they appear in `Recent Notes`.
+
+### UX notes
+- The game canvas now shows a keyboard SVG and quick instructions before gameplay starts.
+- The selected MIDI input is stored and automatically reselected after reload when that device is still connected.
 
 ### Validation commands
 - `pnpm -r lint`
@@ -496,3 +501,4 @@ If you want, I can also generate:
 * `AGENTS.md` — how Codex should operate in this codebase (definition of done, commands to run)
 * `PLANS.md` — milestones and checkpoints for MVP → v1
 * `BACKLOG.md` — small, testable tasks for steady progress
+* `docs/DEPLOYMENT.md` — VM hosting, SSL (Caddy), and GitHub Actions CI/CD deploy setup

@@ -7,14 +7,15 @@ export { SCENE_KEYS } from '@/game/sceneKeys';
 
 const resolveGameSize = (): { width: number; height: number } => {
   if (typeof window === 'undefined') {
-    return { width: 1080, height: 1080 };
+    return { width: 1728, height: 1080 };
   }
 
-  const minSquare = 1080;
-  const verticalPadding = 48;
-  const byHeight = Math.max(minSquare, Math.floor(window.innerHeight - verticalPadding));
+  const minHeight = 760;
+  const verticalPadding = 56;
+  const byHeight = Math.max(minHeight, Math.floor(window.innerHeight - verticalPadding));
+  const widthByAspect = Math.floor(byHeight * 1.6);
 
-  return { width: byHeight, height: byHeight };
+  return { width: widthByAspect, height: byHeight };
 };
 
 export const createGameConfig = (container: string): Phaser.Types.Core.GameConfig => ({
@@ -22,6 +23,10 @@ export const createGameConfig = (container: string): Phaser.Types.Core.GameConfi
   type: Phaser.AUTO,
   parent: container,
   backgroundColor: '#020617',
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
   scene: [BootScene, MenuScene, GameScene, GameOverScene],
   physics: {
     default: 'arcade',

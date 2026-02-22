@@ -1,0 +1,15 @@
+[Unit]
+Description=MIDI Invaders API
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/midi-invaders
+EnvironmentFile=/etc/midi-invaders/api.env
+ExecStart=/usr/bin/env pnpm -C apps/api start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

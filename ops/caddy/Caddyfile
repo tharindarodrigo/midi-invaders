@@ -1,0 +1,18 @@
+# Replace example.com with your real domain.
+example.com {
+  encode gzip zstd
+
+  # Frontend (Vite build output)
+  root * /opt/midi-invaders/apps/web/dist
+  file_server
+
+  # API server
+  handle /api/* {
+    reverse_proxy 127.0.0.1:3001
+  }
+
+  # Optional health endpoint passthrough
+  handle /health {
+    reverse_proxy 127.0.0.1:3001
+  }
+}
