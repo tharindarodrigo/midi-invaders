@@ -7,9 +7,14 @@ export const canStartWithInputMode = (
   inputMode: InputMode,
   midiStatus: MidiStatus,
   selectedMidiInputId: string | null,
+  microphoneStatus: MidiStatus,
 ): boolean => {
   if (inputMode === 'keyboard') {
     return true;
+  }
+
+  if (inputMode === 'microphone') {
+    return microphoneStatus === 'ready';
   }
 
   return midiStatus === 'ready' && selectedMidiInputId !== null;
