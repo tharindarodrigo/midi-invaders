@@ -41,6 +41,7 @@
 - Laser shots now fire as directional red blaster bursts that impact the target, then fade in glow strength.
 - Input mode can now be switched between `Computer Keyboard`, `MIDI Keyboard`, and `Microphone Pitch` from the HUD and start-canvas overlay.
 - In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
+- Microphone pitch note events now require a short stability window (3 consecutive frames, about 50ms) to reduce note jitter from instrument overtones.
 - Computer keyboard mode now plays synthesized note audio on key press/release.
 
 ### Validation commands

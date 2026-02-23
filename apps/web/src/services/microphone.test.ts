@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { detectPitchFromBuffer, frequencyToMidiNote } from '@/services/microphone';
+import {
+  confirmStableMidiNote,
+  createPitchStabilityState,
+  detectPitchFromBuffer,
+  frequencyToMidiNote,
+} from '@/services/microphone';
 
 describe('frequencyToMidiNote', () => {
   it('maps common tuning frequencies to nearest MIDI notes', () => {
@@ -28,5 +33,36 @@ describe('detectPitchFromBuffer', () => {
     const detected = detectPitchFromBuffer(buffer, sampleRate);
     expect(detected).not.toBeNull();
     expect(Math.abs((detected ?? 0) - expectedFrequency)).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('confirmStableMidiNote', () => {
+  it('only confirms a note after enough consecutive frames', () => {
+    const state = createPitchStabilityState();
+
+    expect(confirmStableMidiNote(state, 60, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 60, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 60, 3)).toBe(60);
+  });
+
+  it('ignores single-frame fluctuations before confirming a note', () => {
+    const state = createPitchStabilityState();
+
+    expect(confirmStableMidiNote(state, 60, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 61, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 60, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 60, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 60, 3)).toBe(60);
+  });
+
+  it('resets stability tracking when pitch disappears', () => {
+    const state = createPitchStabilityState();
+
+    expect(confirmStableMidiNote(state, 64, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 64, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, null, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 64, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 64, 3)).toBeNull();
+    expect(confirmStableMidiNote(state, 64, 3)).toBe(64);
   });
 });

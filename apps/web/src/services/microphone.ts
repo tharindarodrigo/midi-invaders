@@ -10,9 +10,46 @@ type NoteListener = (event: InputNoteEvent) => void;
 const MIN_RMS = 0.01;
 // Emit note_off only after consecutive silent frames to reduce jittery note toggles.
 const SILENCE_FRAMES_FOR_NOTE_OFF = 6;
+// Require the same detected note across a few frames before emitting note_on/switch.
+const NOTE_STABILITY_FRAMES = 3;
 // 2048 balances pitch stability and latency for real-time gameplay.
 const PITCH_DETECTION_FFT_SIZE = 2048;
 const DEFAULT_MICROPHONE_VELOCITY = 100;
+
+export interface PitchStabilityState {
+  candidateNote: number | null;
+  candidateFrames: number;
+}
+
+export const createPitchStabilityState = (): PitchStabilityState => ({
+  candidateNote: null,
+  candidateFrames: 0,
+});
+
+export const resetPitchStabilityState = (state: PitchStabilityState): void => {
+  state.candidateNote = null;
+  state.candidateFrames = 0;
+};
+
+export const confirmStableMidiNote = (
+  state: PitchStabilityState,
+  detectedNote: number | null,
+  requiredFrames: number = NOTE_STABILITY_FRAMES,
+): number | null => {
+  if (detectedNote === null) {
+    resetPitchStabilityState(state);
+    return null;
+  }
+
+  if (state.candidateNote === detectedNote) {
+    state.candidateFrames += 1;
+  } else {
+    state.candidateNote = detectedNote;
+    state.candidateFrames = 1;
+  }
+
+  return state.candidateFrames >= requiredFrames ? state.candidateNote : null;
+};
 
 const createAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') {
@@ -99,6 +136,7 @@ export const detectPitchFromBuffer = (buffer: Float32Array, sampleRate: number):
 
 export class MicrophonePitchService {
   private readonly noteListeners = new Set<NoteListener>();
+  private readonly pitchStabilityState = createPitchStabilityState();
   private audioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
@@ -154,6 +192,7 @@ export class MicrophonePitchService {
     }
 
     this.silenceFrames = 0;
+    resetPitchStabilityState(this.pitchStabilityState);
     this.sourceNode?.disconnect();
     this.analyserNode?.disconnect();
     this.sourceNode = null;
@@ -185,21 +224,27 @@ export class MicrophonePitchService {
       const frequency = detectPitchFromBuffer(data, audioContext.sampleRate);
       const midiNote = frequency !== null ? frequencyToMidiNote(frequency) : null;
       if (midiNote !== null) {
-        if (this.activeNote === null) {
-          this.activeNote = midiNote;
-          this.emitNoteEvent(this.toEvent('note_on', midiNote, DEFAULT_MICROPHONE_VELOCITY));
-        } else if (this.activeNote !== midiNote) {
-          this.emitNoteEvent(this.toEvent('note_off', this.activeNote, 0));
-          this.activeNote = midiNote;
-          this.emitNoteEvent(this.toEvent('note_on', midiNote, DEFAULT_MICROPHONE_VELOCITY));
+        const stableNote = confirmStableMidiNote(this.pitchStabilityState, midiNote);
+        if (stableNote !== null) {
+          if (this.activeNote === null) {
+            this.activeNote = stableNote;
+            this.emitNoteEvent(this.toEvent('note_on', stableNote, DEFAULT_MICROPHONE_VELOCITY));
+          } else if (this.activeNote !== stableNote) {
+            this.emitNoteEvent(this.toEvent('note_off', this.activeNote, 0));
+            this.activeNote = stableNote;
+            this.emitNoteEvent(this.toEvent('note_on', stableNote, DEFAULT_MICROPHONE_VELOCITY));
+          }
         }
         this.silenceFrames = 0;
-      } else if (this.activeNote !== null) {
-        this.silenceFrames += 1;
-        if (this.silenceFrames >= SILENCE_FRAMES_FOR_NOTE_OFF) {
-          this.emitNoteEvent(this.toEvent('note_off', this.activeNote, 0));
-          this.activeNote = null;
-          this.silenceFrames = 0;
+      } else {
+        resetPitchStabilityState(this.pitchStabilityState);
+        if (this.activeNote !== null) {
+          this.silenceFrames += 1;
+          if (this.silenceFrames >= SILENCE_FRAMES_FOR_NOTE_OFF) {
+            this.emitNoteEvent(this.toEvent('note_off', this.activeNote, 0));
+            this.activeNote = null;
+            this.silenceFrames = 0;
+          }
         }
       }
 
