@@ -24,11 +24,11 @@ export const KEYBOARD_NOTE_MAP: Record<string, number> = {
   u: 81, // A5
   i: 83, // B5
   // C5 octave black keys
-  '2': 73, // C#5
-  '3': 75, // D#5
-  '5': 78, // F#5
-  '6': 80, // G#5
-  '7': 82, // A#5
+  '3': 73, // C#5
+  '4': 75, // D#5
+  '6': 78, // F#5
+  '7': 80, // G#5
+  '8': 82, // A#5
 };
 
 export const createKeyboardFallbackHandler = (
@@ -58,6 +58,10 @@ const shouldIgnoreKeyEvent = (event: KeyboardEvent): boolean => {
   return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
 };
 
+const hasShortcutModifier = (event: KeyboardEvent): boolean => {
+  return event.metaKey || event.ctrlKey || event.altKey;
+};
+
 const toNoteEvent = (
   type: InputNoteEvent['type'],
   note: number,
@@ -78,7 +82,7 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
   const activeKeys = new Set<string>();
 
   const handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat || shouldIgnoreKeyEvent(event)) {
+    if (event.repeat || shouldIgnoreKeyEvent(event) || hasShortcutModifier(event)) {
       return;
     }
 
@@ -100,6 +104,10 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
   };
 
   const handleKeyUp = (event: KeyboardEvent): void => {
+    if (shouldIgnoreKeyEvent(event)) {
+      return;
+    }
+
     const key = event.key.toLowerCase();
     const note = KEYBOARD_NOTE_MAP[key];
 
@@ -107,7 +115,13 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
       return;
     }
 
-    event.preventDefault();
+    if (!hasShortcutModifier(event)) {
+      event.preventDefault();
+    }
+
+    if (!activeKeys.has(key)) {
+      return;
+    }
 
     activeKeys.delete(key);
     onNoteEvent(toNoteEvent('note_off', note, key, event.timeStamp));

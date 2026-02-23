@@ -130,9 +130,11 @@ export function HudOverlay({
       <p>Scene: {hud.scene}</p>
       <p>Wave: {hud.wave}</p>
       <p>Score: {hud.score}</p>
+      <p>1UP Meter: {hud.lifeScore}/1000</p>
       <p>Lives: {hud.lives}</p>
       <p>Invaders: {hud.activeInvaders}</p>
-      <p>Miss penalty: -50 points + 1s freeze</p>
+      <p>Miss penalty: -50 score, -50 1UP meter, +1s freeze</p>
+      <p>Life-up power-up: center green pulse clears nearest 5 invaders</p>
 
       <h2 className="subheading">Recent Notes</h2>
       <ul className="note-list">

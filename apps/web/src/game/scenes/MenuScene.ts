@@ -23,6 +23,7 @@ export class MenuScene extends Phaser.Scene {
 
     gameBridge.publishHud({
       score: 0,
+      lifeScore: 0,
       lives: 3,
       wave: 1,
       activeInvaders: 0,

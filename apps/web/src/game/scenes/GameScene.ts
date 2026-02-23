@@ -3,7 +3,7 @@ import { createArenaConfig } from '@/game/arenaConfig';
 import { gameBridge } from '@/game/gameBridge';
 import { GameStateSystem } from '@/game/systems/gameStateSystem';
 import { renderStaffNoteToCanvas } from '@/services/notation';
-import type { DifficultyLevel } from '@/types/gameplay';
+import type { DifficultyLevel, InvaderEntity } from '@/types/gameplay';
 import type { InputNoteEvent } from '@/types/input';
 
 interface InvaderView {
@@ -32,6 +32,7 @@ const SCORE_POPUP_RISE_PX = 54;
 const MISS_FREEZE_MS = 1000;
 const LASER_TRAVEL_DURATION_MS = 85;
 const LASER_FADE_DURATION_MS = 35;
+const POWER_UP_PULSE_DURATION_MS = 540;
 
 export class GameScene extends Phaser.Scene {
   private arenaConfig = createArenaConfig();
@@ -173,6 +174,10 @@ export class GameScene extends Phaser.Scene {
       );
     } else if (hitX !== undefined && hitY !== undefined) {
       this.playHitFlash(hitX, hitY);
+    }
+
+    if (result.powerUp.activated) {
+      this.playPowerUpPulse(result.powerUp.destroyedInvaders);
     }
 
     this.publishHud();
@@ -388,6 +393,88 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private playPowerUpPulse(destroyedInvaders: InvaderEntity[]): void {
+    const { centerX, centerY, coreRadius, spawnRadius } = this.arenaConfig;
+
+    const waveStartRadius = coreRadius + 6;
+    const waveEndRadius = spawnRadius + 36;
+    const waveTravelDistance = Math.max(1, waveEndRadius - waveStartRadius);
+    const wave = { radius: waveStartRadius, alpha: 0.96, lineWidth: 16 };
+
+    const centerBurst = this.add.circle(centerX, centerY, coreRadius + 12, 0x4ade80, 0.52);
+    centerBurst.setBlendMode(Phaser.BlendModes.ADD);
+    centerBurst.setDepth(14);
+
+    const waveHalo = this.add.graphics();
+    waveHalo.setDepth(14);
+    waveHalo.setBlendMode(Phaser.BlendModes.ADD);
+
+    const waveFront = this.add.graphics();
+    waveFront.setDepth(15);
+    waveFront.setBlendMode(Phaser.BlendModes.ADD);
+
+    const drawWave = (): void => {
+      waveHalo.clear();
+      waveHalo.lineStyle(wave.lineWidth * 2.2, 0x22c55e, wave.alpha * 0.28);
+      waveHalo.strokeCircle(centerX, centerY, wave.radius);
+
+      waveFront.clear();
+      waveFront.lineStyle(wave.lineWidth, 0x86efac, wave.alpha);
+      waveFront.strokeCircle(centerX, centerY, wave.radius);
+    };
+
+    drawWave();
+
+    this.tweens.add({
+      targets: centerBurst,
+      scaleX: 2.8,
+      scaleY: 2.8,
+      alpha: 0,
+      duration: 260,
+      ease: 'Cubic.Out',
+      onComplete: () => centerBurst.destroy(),
+    });
+
+    this.tweens.add({
+      targets: wave,
+      radius: waveEndRadius,
+      alpha: 0,
+      lineWidth: 2,
+      duration: POWER_UP_PULSE_DURATION_MS,
+      ease: 'Cubic.Out',
+      onUpdate: drawWave,
+      onComplete: () => {
+        waveHalo.destroy();
+        waveFront.destroy();
+      },
+    });
+
+    for (const invader of destroyedInvaders) {
+      const distance = Math.hypot(invader.x - centerX, invader.y - centerY);
+      const waveProgress = Phaser.Math.Clamp((distance - waveStartRadius) / waveTravelDistance, 0, 1);
+      const delay = Math.round(waveProgress * POWER_UP_PULSE_DURATION_MS);
+
+      this.time.delayedCall(delay, () => {
+        this.playPowerUpHitFlash(invader.x, invader.y);
+        this.destroyInvaderView(invader.id);
+      });
+    }
+  }
+
+  private playPowerUpHitFlash(x: number, y: number): void {
+    const flash = this.add.circle(x, y, 16, 0x86efac, 0.95).setBlendMode(Phaser.BlendModes.ADD);
+
+    this.tweens.add({
+      targets: flash,
+      scaleX: 2.1,
+      scaleY: 2.1,
+      alpha: 0,
+      duration: 180,
+      ease: 'Quad.Out',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
   private playScorePopup(x: number, y: number, scoreDelta: number): void {
     if (scoreDelta === 0) {
       return;
@@ -456,6 +543,7 @@ export class GameScene extends Phaser.Scene {
     const state = this.gameState.getState();
     gameBridge.publishHud({
       score: state.score,
+      lifeScore: state.lifeScore,
       lives: state.lives,
       wave: state.wave,
       activeInvaders: state.invaders.length,

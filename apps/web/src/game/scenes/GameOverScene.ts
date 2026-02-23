@@ -29,6 +29,7 @@ export class GameOverScene extends Phaser.Scene {
 
     gameBridge.publishHud({
       score,
+      lifeScore: 0,
       lives: 0,
       wave: 0,
       activeInvaders: 0,

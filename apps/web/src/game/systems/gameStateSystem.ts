@@ -15,9 +15,12 @@ import {
 import { resolveNearestThreatTarget } from '@/game/systems/targetResolver';
 
 const MISS_PENALTY_POINTS = 50;
+const LIFE_UP_THRESHOLD = 1000;
+const POWER_UP_DESTROY_COUNT = 5;
 
 const createInitialState = (config: ArenaConfig): ArenaState => ({
   score: 0,
+  lifeScore: 0,
   wave: 1,
   lives: config.startingLives,
   gameOver: false,
@@ -74,6 +77,10 @@ export class GameStateSystem {
         laser: null,
         waveAdvanced: false,
         scoreDelta: 0,
+        powerUp: {
+          activated: false,
+          destroyedInvaders: [],
+        },
       };
     }
 
@@ -85,20 +92,25 @@ export class GameStateSystem {
     });
 
     if (!resolution.matched || !resolution.target) {
-      this.state.score -= MISS_PENALTY_POINTS;
+      this.applyScoreDelta(-MISS_PENALTY_POINTS);
       return {
         kind: 'miss',
         target: null,
         laser: null,
         waveAdvanced: false,
         scoreDelta: -MISS_PENALTY_POINTS,
+        powerUp: {
+          activated: false,
+          destroyedInvaders: [],
+        },
       };
     }
 
     const target = resolution.target;
     this.state.invaders = this.state.invaders.filter((invader) => invader.id !== target.id);
     const scoreDelta = this.config.basePoints;
-    this.state.score += scoreDelta;
+    const extraLives = this.applyScoreDelta(scoreDelta);
+    const destroyedByPowerUp = extraLives > 0 ? this.destroyNearestInvaders(POWER_UP_DESTROY_COUNT) : [];
 
     this.state.hitsThisWave += 1;
     let waveAdvanced = false;
@@ -125,7 +137,49 @@ export class GameStateSystem {
       laser,
       waveAdvanced,
       scoreDelta,
+      powerUp: {
+        activated: extraLives > 0,
+        destroyedInvaders: destroyedByPowerUp,
+      },
     };
+  }
+
+  private applyScoreDelta(scoreDelta: number): number {
+    this.state.score += scoreDelta;
+
+    const nextLifeScore = this.state.lifeScore + scoreDelta;
+    if (nextLifeScore <= 0) {
+      this.state.lifeScore = 0;
+      return 0;
+    }
+
+    const extraLives = Math.floor(nextLifeScore / LIFE_UP_THRESHOLD);
+    this.state.lifeScore = nextLifeScore % LIFE_UP_THRESHOLD;
+
+    if (extraLives > 0) {
+      this.state.lives += extraLives;
+    }
+
+    return extraLives;
+  }
+
+  private destroyNearestInvaders(count: number): InvaderEntity[] {
+    if (count <= 0 || this.state.invaders.length === 0) {
+      return [];
+    }
+
+    const centerX = this.config.centerX;
+    const centerY = this.config.centerY;
+    const sortedByDistance = [...this.state.invaders].sort((left, right) => {
+      const leftDistanceSq = (left.x - centerX) ** 2 + (left.y - centerY) ** 2;
+      const rightDistanceSq = (right.x - centerX) ** 2 + (right.y - centerY) ** 2;
+      return leftDistanceSq - rightDistanceSq;
+    });
+    const destroyedInvaders = sortedByDistance.slice(0, count);
+    const destroyedIds = new Set(destroyedInvaders.map((invader) => invader.id));
+    this.state.invaders = this.state.invaders.filter((invader) => !destroyedIds.has(invader.id));
+
+    return destroyedInvaders;
   }
 
   delayTimersForFreeze(durationMs: number): void {

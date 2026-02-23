@@ -43,7 +43,10 @@ describe('game state system', () => {
     expect(result.kind).toBe('hit');
     expect(result.target?.id).toBe('target');
     expect(result.scoreDelta).toBe(config.basePoints);
+    expect(result.powerUp.activated).toBe(false);
+    expect(result.powerUp.destroyedInvaders).toHaveLength(0);
     expect(state.score).toBe(100);
+    expect(state.lifeScore).toBe(100);
     expect(state.invaders).toHaveLength(0);
     expect(state.lasers).toHaveLength(1);
   });
@@ -60,10 +63,77 @@ describe('game state system', () => {
 
     expect(miss.kind).toBe('miss');
     expect(miss.scoreDelta).toBe(-50);
+    expect(miss.powerUp.activated).toBe(false);
     expect(hit.kind).toBe('hit');
     expect(hit.scoreDelta).toBe(config.basePoints);
     expect(system.getState().score).toBe(50);
+    expect(system.getState().lifeScore).toBe(100);
     expect(system.getState().invaders).toHaveLength(0);
+  });
+
+  it('awards one extra life for each 1000 life-score and keeps the remainder', () => {
+    const config = createArenaConfig();
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.getState().lifeScore = 950;
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 100, config.centerY));
+
+    const hit = system.processNote(60, 10);
+    const state = system.getState();
+
+    expect(hit.kind).toBe('hit');
+    expect(hit.powerUp.activated).toBe(true);
+    expect(state.lives).toBe(config.startingLives + 1);
+    expect(state.lifeScore).toBe(50);
+    expect(state.score).toBe(100);
+  });
+
+  it('power-up destroys the nearest five invaders from center when life-up is earned', () => {
+    const config = createArenaConfig();
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.getState().lifeScore = 900;
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 180, config.centerY));
+    system.addInvaderForTest(makeInvader('a', 61, config.centerX + 20, config.centerY));
+    system.addInvaderForTest(makeInvader('b', 62, config.centerX + 30, config.centerY));
+    system.addInvaderForTest(makeInvader('c', 63, config.centerX + 40, config.centerY));
+    system.addInvaderForTest(makeInvader('d', 64, config.centerX + 50, config.centerY));
+    system.addInvaderForTest(makeInvader('e', 65, config.centerX + 60, config.centerY));
+    system.addInvaderForTest(makeInvader('f', 66, config.centerX + 220, config.centerY));
+
+    const hit = system.processNote(60, 10);
+    const state = system.getState();
+    const destroyedIds = hit.powerUp.destroyedInvaders.map((invader) => invader.id);
+
+    expect(hit.kind).toBe('hit');
+    expect(hit.powerUp.activated).toBe(true);
+    expect(destroyedIds).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(state.invaders.map((invader) => invader.id)).toEqual(['f']);
+    expect(state.lives).toBe(config.startingLives + 1);
+    expect(state.lifeScore).toBe(0);
+  });
+
+  it('floors life-score at zero on penalties and never removes lives from penalties', () => {
+    const config = createArenaConfig();
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.getState().lifeScore = 980;
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 100, config.centerY));
+    system.processNote(60, 10);
+
+    const livesAfterLifeUp = system.getState().lives;
+    const miss = system.processNote(61, 100);
+
+    expect(miss.kind).toBe('miss');
+    expect(system.getState().lives).toBe(livesAfterLifeUp);
+    expect(system.getState().lifeScore).toBe(30);
+
+    system.getState().lifeScore = 20;
+    system.processNote(61, 200);
+    expect(system.getState().lifeScore).toBe(0);
   });
 
   it('decrements lives when invaders reach core and ends game at zero lives', () => {

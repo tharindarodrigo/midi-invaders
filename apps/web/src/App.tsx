@@ -4,6 +4,7 @@ import { createGameConfig } from '@/game/config';
 import { gameBridge } from '@/game/gameBridge';
 import { canStartWithInputMode, shouldProcessInputEvent } from '@/services/inputMode';
 import { bindKeyboardFallback } from '@/services/keyboardFallback';
+import { KeyboardSynth } from '@/services/keyboardSynth';
 import { MidiService, supportsWebMidi } from '@/services/midi';
 import { getStoredMidiInputId, setStoredMidiInputId } from '@/services/midiPreferences';
 import type { DifficultyLevel } from '@/types/gameplay';
@@ -15,6 +16,7 @@ const MAX_NOTE_HISTORY = 12;
 
 const initialHud: HudState = {
   score: 0,
+  lifeScore: 0,
   lives: 3,
   wave: 1,
   activeInvaders: 0,
@@ -24,6 +26,7 @@ const initialHud: HudState = {
 export default function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const midiServiceRef = useRef<MidiService | null>(null);
+  const keyboardSynthRef = useRef<KeyboardSynth | null>(null);
   const canvasSectionRef = useRef<HTMLElement | null>(null);
   const containerId = 'phaser-game';
 
@@ -46,6 +49,7 @@ export default function App() {
       return;
     }
 
+    keyboardSynthRef.current?.handleEvent(event);
     setNoteHistory((previous) => [event, ...previous].slice(0, MAX_NOTE_HISTORY));
     gameBridge.publishInput(event);
   }, []);
@@ -102,6 +106,10 @@ export default function App() {
   useEffect(() => {
     selectedInputModeRef.current = selectedInputMode;
     setNoteHistory([]);
+
+    if (selectedInputMode !== 'keyboard') {
+      keyboardSynthRef.current?.stopAll();
+    }
   }, [selectedInputMode]);
 
   useEffect(() => {
@@ -113,7 +121,9 @@ export default function App() {
     gameRef.current = new Phaser.Game(config);
 
     const midiService = new MidiService();
+    const keyboardSynth = new KeyboardSynth();
     midiServiceRef.current = midiService;
+    keyboardSynthRef.current = keyboardSynth;
 
     const unsubscribeHud = gameBridge.onHud((nextHud) => setHud(nextHud));
     const unsubscribeMidi = midiService.onNoteEvent((event) => handleInputEvent(event));
@@ -144,6 +154,8 @@ export default function App() {
       unsubscribeMidi();
       unsubscribeDevices();
       unbindKeyboard();
+      keyboardSynth.destroy();
+      keyboardSynthRef.current = null;
       midiService.disconnect();
       midiServiceRef.current = null;
       gameRef.current?.destroy(true);
@@ -276,7 +288,7 @@ export default function App() {
                   <rect x="339" y="12" width="26" height="58" rx="3" />
                 </g>
                 <text x="24" y="120" fill="#e2e8f0" fontSize="12">
-                  Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 2 3 5 6 7)
+                  Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 3 4 6 7 8)
                 </text>
               </svg>
               <button

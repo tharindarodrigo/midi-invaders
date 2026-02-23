@@ -42,6 +42,7 @@ export interface LaserShot {
 
 export interface ArenaState {
   score: number;
+  lifeScore: number;
   wave: number;
   lives: number;
   gameOver: boolean;
@@ -61,6 +62,10 @@ export interface NoteProcessResult {
   laser: LaserShot | null;
   waveAdvanced: boolean;
   scoreDelta: number;
+  powerUp: {
+    activated: boolean;
+    destroyedInvaders: InvaderEntity[];
+  };
 }
 
 export interface ArenaStepResult {
