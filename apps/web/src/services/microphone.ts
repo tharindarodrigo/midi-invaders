@@ -10,6 +10,12 @@ type NoteListener = (event: InputNoteEvent) => void;
 const MIN_RMS = 0.01;
 // Emit note_off only after consecutive silent frames to reduce jittery note toggles.
 const SILENCE_FRAMES_FOR_NOTE_OFF = 6;
+const MIN_MIDI_NOTE = 0;
+const MAX_MIDI_NOTE = 127;
+// Reject weak autocorrelation matches that are likely noise.
+const MIN_AUTOCORRELATION_CONFIDENCE = 0.2;
+// Prefer the first strong local peak to reduce octave/subharmonic jumps.
+const FIRST_PEAK_CORRELATION_RATIO = 0.45;
 // Require the same detected note across a few frames before emitting note_on/switch.
 const NOTE_STABILITY_FRAMES = 3;
 // 2048 balances pitch stability and latency for real-time gameplay.
@@ -87,7 +93,12 @@ export const frequencyToMidiNote = (frequency: number): number | null => {
   }
 
   // Equal temperament reference: A4 = MIDI 69 = 440Hz.
-  return Math.round(69 + 12 * Math.log2(frequency / 440));
+  const note = Math.round(69 + 12 * Math.log2(frequency / 440));
+  if (note < MIN_MIDI_NOTE || note > MAX_MIDI_NOTE) {
+    return null;
+  }
+
+  return note;
 };
 
 export const detectPitchFromBuffer = (buffer: Float32Array, sampleRate: number): number | null => {
@@ -103,31 +114,67 @@ export const detectPitchFromBuffer = (buffer: Float32Array, sampleRate: number):
     return null;
   }
 
-  const correlations = new Float32Array(size);
-  for (let offset = 0; offset < size; offset += 1) {
+  const maxOffset = Math.floor(size / 2);
+  const correlations = new Float32Array(maxOffset + 1);
+  for (let offset = 0; offset <= maxOffset; offset += 1) {
     let correlation = 0;
-    for (let index = 0; index + offset < size; index += 1) {
+    const overlap = size - offset;
+    for (let index = 0; index < overlap; index += 1) {
       correlation += buffer[index] * buffer[index + offset];
     }
-    correlations[offset] = correlation;
+    correlations[offset] = overlap > 0 ? correlation / overlap : 0;
   }
 
+  const referenceCorrelation = correlations[0];
+  if (referenceCorrelation <= 0) {
+    return null;
+  }
+
+  const maxFirstDip = Math.floor(maxOffset / 2);
   let firstDip = 0;
-  while (firstDip + 1 < size && correlations[firstDip] > correlations[firstDip + 1]) {
+  while (
+    firstDip + 1 <= maxOffset &&
+    firstDip < maxFirstDip &&
+    correlations[firstDip] > correlations[firstDip + 1]
+  ) {
     firstDip += 1;
   }
 
-  let maxCorrelation = -1;
   let bestOffset = -1;
-  for (let offset = firstDip; offset < size; offset += 1) {
+  let bestCorrelation = -Infinity;
+  let confidentOffset = -1;
+  let confidentCorrelation = -Infinity;
+  for (let offset = Math.max(1, firstDip + 1); offset < maxOffset; offset += 1) {
     const correlation = correlations[offset];
-    if (correlation > maxCorrelation) {
-      maxCorrelation = correlation;
+    const previousCorrelation = correlations[offset - 1];
+    const nextCorrelation = correlations[offset + 1];
+    const isLocalPeak = correlation > previousCorrelation && correlation >= nextCorrelation;
+    if (!isLocalPeak) {
+      continue;
+    }
+
+    if (correlation > bestCorrelation) {
+      bestCorrelation = correlation;
       bestOffset = offset;
+    }
+
+    if (correlation / referenceCorrelation >= FIRST_PEAK_CORRELATION_RATIO) {
+      confidentOffset = offset;
+      confidentCorrelation = correlation;
+      break;
     }
   }
 
-  if (bestOffset <= 0) {
+  if (confidentOffset > 0) {
+    bestOffset = confidentOffset;
+    bestCorrelation = confidentCorrelation;
+  }
+
+  if (
+    bestOffset <= 0 ||
+    !Number.isFinite(bestCorrelation) ||
+    bestCorrelation / referenceCorrelation < MIN_AUTOCORRELATION_CONFIDENCE
+  ) {
     return null;
   }
 

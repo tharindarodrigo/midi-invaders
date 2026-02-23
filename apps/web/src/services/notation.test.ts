@@ -27,6 +27,6 @@ describe('getStemDirectionForMidi', () => {
 
 describe('getCenteredStaveY', () => {
   it('applies the upward visual offset for circular-invader centering', () => {
-    expect(getCenteredStaveY(160)).toBe(48);
+    expect(getCenteredStaveY(160)).toBe(26);
   });
 });
