@@ -6,8 +6,13 @@ type WebAudioWindow = Window & {
 
 type NoteListener = (event: InputNoteEvent) => void;
 
+// Ignore very quiet/noisy frames so ambient hiss does not trigger false notes.
 const MIN_RMS = 0.01;
+// Emit note_off only after consecutive silent frames to reduce jittery note toggles.
 const SILENCE_FRAMES_FOR_NOTE_OFF = 6;
+// 2048 balances pitch stability and latency for real-time gameplay.
+const PITCH_DETECTION_FFT_SIZE = 2048;
+const DEFAULT_MICROPHONE_VELOCITY = 100;
 
 const createAudioContext = (): AudioContext | null => {
   if (typeof window === 'undefined') {
@@ -44,6 +49,7 @@ export const frequencyToMidiNote = (frequency: number): number | null => {
     return null;
   }
 
+  // Equal temperament reference: A4 = MIDI 69 = 440Hz.
   return Math.round(69 + 12 * Math.log2(frequency / 440));
 };
 
@@ -112,6 +118,7 @@ export class MicrophonePitchService {
 
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
+        // Disable voice-call style processing to preserve raw pitch information.
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
@@ -125,7 +132,7 @@ export class MicrophonePitchService {
 
     const source = audioContext.createMediaStreamSource(stream);
     const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
+    analyser.fftSize = PITCH_DETECTION_FFT_SIZE;
     source.connect(analyser);
 
     this.audioContext = audioContext;
@@ -180,11 +187,11 @@ export class MicrophonePitchService {
       if (midiNote !== null) {
         if (this.activeNote === null) {
           this.activeNote = midiNote;
-          this.emitNoteEvent(this.toEvent('note_on', midiNote, 100));
+          this.emitNoteEvent(this.toEvent('note_on', midiNote, DEFAULT_MICROPHONE_VELOCITY));
         } else if (this.activeNote !== midiNote) {
           this.emitNoteEvent(this.toEvent('note_off', this.activeNote, 0));
           this.activeNote = midiNote;
-          this.emitNoteEvent(this.toEvent('note_on', midiNote, 100));
+          this.emitNoteEvent(this.toEvent('note_on', midiNote, DEFAULT_MICROPHONE_VELOCITY));
         }
         this.silenceFrames = 0;
       } else if (this.activeNote !== null) {

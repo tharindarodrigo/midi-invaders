@@ -248,6 +248,11 @@ export default function App() {
       : selectedInputMode === 'midi'
         ? 'MIDI Keyboard'
         : 'Microphone Pitch';
+  const startButtonLabel = canStartGame
+    ? 'Play'
+    : selectedInputMode === 'microphone'
+      ? 'Connect Microphone to Play'
+      : 'Connect MIDI to Play';
   const startGame = useCallback(() => {
     gameBridge.send({ type: 'start', settings: gameplaySettings });
   }, [gameplaySettings]);
@@ -413,7 +418,7 @@ export default function App() {
                 disabled={!canStartGame}
                 onClick={startGame}
               >
-                {canStartGame ? 'Play' : selectedInputMode === 'microphone' ? 'Connect Microphone to Play' : 'Connect MIDI to Play'}
+                {startButtonLabel}
               </button>
             </div>
           ) : null}
