@@ -3,6 +3,8 @@ import { createArenaConfig } from '@/game/arenaConfig';
 import { gameBridge } from '@/game/gameBridge';
 import { resolveInvaderClef, type StaffClef } from '@/game/notationProfile';
 import { GameStateSystem } from '@/game/systems/gameStateSystem';
+import { PromptScheduler } from '@/game/systems/promptScheduler';
+import { InvaderPromptSynth } from '@/services/invaderPromptSynth';
 import { renderStaffNoteToCanvas } from '@/services/notation';
 import {
   DEFAULT_GAMEPLAY_SETTINGS,
@@ -13,6 +15,7 @@ import type { InputNoteEvent } from '@/types/input';
 
 interface InvaderView {
   container: Phaser.GameObjects.Container;
+  shell: Phaser.GameObjects.Arc;
 }
 
 interface LaserView {
@@ -42,10 +45,16 @@ const MISS_FREEZE_MS = 1000;
 const LASER_TRAVEL_DURATION_MS = 85;
 const LASER_FADE_DURATION_MS = 35;
 const POWER_UP_PULSE_DURATION_MS = 540;
+const PROMPT_NOTE_DURATION_MS = 280;
+const PROMPT_NOTE_GAP_MS = 120;
+const PITCH_GLOW_DURATION_MS = 220;
+const PITCH_GLOW_COLOR = 0xa855f7;
 
 export class GameScene extends Phaser.Scene {
   private arenaConfig = createArenaConfig();
   private gameState!: GameStateSystem;
+  private promptScheduler: PromptScheduler | null = null;
+  private readonly promptSynth = new InvaderPromptSynth();
   private readonly invaderViews = new Map<string, InvaderView>();
   private readonly laserViews = new Map<string, LaserView>();
   private unsubscribeCommand?: () => void;
@@ -53,6 +62,7 @@ export class GameScene extends Phaser.Scene {
   private isEnding = false;
   private freezeUntil = 0;
   private freezeDurationPendingMs = 0;
+  private microphoneSuppressed = false;
 
   constructor() {
     super('GameScene');
@@ -70,12 +80,19 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
     this.gameState = new GameStateSystem(this.arenaConfig);
     this.gameState.reset(this.time.now);
+    this.promptScheduler =
+      this.arenaConfig.mode === 'pitch'
+        ? new PromptScheduler(this.arenaConfig.promptRepeatMs)
+        : null;
+    this.promptSynth.stop();
     this.isEnding = false;
     this.freezeUntil = 0;
     this.freezeDurationPendingMs = 0;
+    this.setMicrophoneSuppression(false);
 
     this.drawArena();
     this.renderInitialInvaders();
+    this.syncPitchPrompts(this.gameState.getState().invaders, this.time.now);
 
     this.unsubscribeCommand = gameBridge.onCommand((command) => {
       if (command.type === 'end') {
@@ -113,7 +130,7 @@ export class GameScene extends Phaser.Scene {
     const step = this.gameState.step(time, delta);
 
     for (const invader of step.spawned) {
-      this.renderInvader(invader.id, invader.note, invader.x, invader.y);
+      this.renderInvader(invader);
     }
 
     for (const invader of step.reachedCore) {
@@ -126,6 +143,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     const state = this.gameState.getState();
+    this.syncPitchPrompts(state.invaders, time);
+
     for (const invader of state.invaders) {
       const view = this.invaderViews.get(invader.id);
       if (!view) {
@@ -140,6 +159,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    this.maybePlayPitchPrompt(time);
     this.publishHud();
   }
 
@@ -161,6 +181,14 @@ export class GameScene extends Phaser.Scene {
       this.playMissPulse();
       this.playScorePopup(this.arenaConfig.centerX, this.arenaConfig.centerY, result.scoreDelta);
       this.freezeForMs(MISS_FREEZE_MS);
+      this.publishHud();
+      return;
+    }
+
+    if (result.kind === 'progress') {
+      if (this.arenaConfig.mode === 'pitch' && result.target) {
+        this.playPitchPromptGlow(result.target.id);
+      }
       this.publishHud();
       return;
     }
@@ -191,6 +219,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (result.powerUp.activated) {
+      if (this.arenaConfig.mode === 'pitch') {
+        for (const invader of result.powerUp.destroyedInvaders) {
+          this.promptSynth.stopInvader(invader.id);
+          this.promptScheduler?.clearInvader(invader.id);
+        }
+      }
       this.playPowerUpPulse(result.powerUp.destroyedInvaders);
     }
 
@@ -215,13 +249,12 @@ export class GameScene extends Phaser.Scene {
   private renderInitialInvaders(): void {
     const state = this.gameState.getState();
     for (const invader of state.invaders) {
-      this.renderInvader(invader.id, invader.note, invader.x, invader.y);
+      this.renderInvader(invader);
     }
   }
 
-  private renderInvader(id: string, note: number, x: number, y: number): void {
-    const clef = resolveInvaderClef(this.arenaConfig.clefMode, note, id);
-    const notationTextureKey = this.ensureNotationTexture(note, clef);
+  private renderInvader(invader: InvaderEntity): void {
+    const { id, note, x, y } = invader;
 
     const halo = this.add.circle(0, 0, INVADER_HALO_RADIUS, 0x22d3ee, 0.12);
     const shell = this.add.circle(0, 0, INVADER_BODY_RADIUS, 0x020617, 0.88);
@@ -230,18 +263,29 @@ export class GameScene extends Phaser.Scene {
     const innerRing = this.add.circle(0, 0, INVADER_INNER_RING_RADIUS, 0x0b1220, 0.32);
     innerRing.setStrokeStyle(1, 0x38bdf8, 0.72);
 
-    const notationSprite = this.add.image(
-      0,
-      NOTATION_VERTICAL_OFFSET,
-      notationTextureKey === '__MISSING' ? '__WHITE' : notationTextureKey,
-    );
-    if (notationTextureKey === '__MISSING') {
-      notationSprite.setTint(0x94a3b8);
-    }
-    notationSprite.setDisplaySize(NOTATION_IN_BODY_WIDTH, NOTATION_IN_BODY_HEIGHT);
+    const children: Phaser.GameObjects.GameObject[] = [halo, shell, innerRing];
 
-    const container = this.add.container(x, y, [halo, shell, innerRing, notationSprite]);
-    this.invaderViews.set(id, { container });
+    if (this.arenaConfig.mode === 'pitch') {
+      const centerDot = this.add.circle(0, 0, 10, 0xddd6fe, 0.35);
+      centerDot.setStrokeStyle(1, 0xc4b5fd, 0.65);
+      children.push(centerDot);
+    } else {
+      const clef = resolveInvaderClef(this.arenaConfig.clefMode, note, id);
+      const notationTextureKey = this.ensureNotationTexture(note, clef);
+      const notationSprite = this.add.image(
+        0,
+        NOTATION_VERTICAL_OFFSET,
+        notationTextureKey === '__MISSING' ? '__WHITE' : notationTextureKey,
+      );
+      if (notationTextureKey === '__MISSING') {
+        notationSprite.setTint(0x94a3b8);
+      }
+      notationSprite.setDisplaySize(NOTATION_IN_BODY_WIDTH, NOTATION_IN_BODY_HEIGHT);
+      children.push(notationSprite);
+    }
+
+    const container = this.add.container(x, y, children);
+    this.invaderViews.set(id, { container, shell });
   }
 
   private ensureNotationTexture(note: number, clef: StaffClef): string {
@@ -348,6 +392,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private destroyInvaderView(invaderId: string): void {
+    this.promptSynth.stopInvader(invaderId);
+    this.promptScheduler?.clearInvader(invaderId);
+    this.syncMicrophoneSuppressionFromScheduler();
+
     const view = this.invaderViews.get(invaderId);
     if (!view) {
       return;
@@ -543,6 +591,12 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (this.arenaConfig.mode === 'pitch') {
+      this.promptSynth.stop();
+      this.promptScheduler?.clearActivePrompt();
+      this.syncMicrophoneSuppressionFromScheduler();
+    }
+
     this.freezeUntil = this.time.now + durationMs;
     this.freezeDurationPendingMs += durationMs;
     this.cameras.main.shake(120, 0.0035, true);
@@ -551,6 +605,13 @@ export class GameScene extends Phaser.Scene {
   private applyPendingFreezeDelay(): void {
     if (this.freezeDurationPendingMs <= 0) {
       return;
+    }
+
+    if (this.arenaConfig.mode === 'pitch') {
+      this.promptSynth.stop();
+      this.promptScheduler?.clearActivePrompt();
+      this.promptScheduler?.delayAll(this.freezeDurationPendingMs);
+      this.syncMicrophoneSuppressionFromScheduler();
     }
 
     this.gameState.delayTimersForFreeze(this.freezeDurationPendingMs);
@@ -578,6 +639,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.isEnding = true;
+    this.promptSynth.stop();
+    this.promptScheduler?.clearActivePrompt();
+    this.setMicrophoneSuppression(false);
     this.scene.start('GameOverScene', { score: this.gameState.getState().score });
   }
 
@@ -594,5 +658,102 @@ export class GameScene extends Phaser.Scene {
     for (const laserId of this.laserViews.keys()) {
       this.destroyLaserView(laserId);
     }
+
+    this.promptSynth.destroy();
+    this.promptScheduler = null;
+    this.setMicrophoneSuppression(false);
+  }
+
+  private syncPitchPrompts(invaders: InvaderEntity[], now: number): void {
+    if (this.arenaConfig.mode !== 'pitch') {
+      return;
+    }
+
+    this.promptScheduler?.syncInvaders(
+      invaders.map((invader) => invader.id),
+      now,
+    );
+  }
+
+  private maybePlayPitchPrompt(now: number): void {
+    if (this.arenaConfig.mode !== 'pitch') {
+      return;
+    }
+
+    const scheduler = this.promptScheduler;
+    if (!scheduler) {
+      return;
+    }
+
+    const nextInvaderId = scheduler.getNextDueInvader(now);
+    if (!nextInvaderId) {
+      return;
+    }
+
+    const target = this.gameState.getState().invaders.find((invader) => invader.id === nextInvaderId);
+    if (!target) {
+      scheduler.clearInvader(nextInvaderId);
+      return;
+    }
+
+    const durationMs = this.promptSynth.playSequence({
+      invaderId: target.id,
+      notes: target.pattern,
+      noteDurationMs: PROMPT_NOTE_DURATION_MS,
+      gapMs: PROMPT_NOTE_GAP_MS,
+      onNoteStart: (_note, _index, invaderId) => {
+        this.playPitchPromptGlow(invaderId);
+      },
+      onSequenceComplete: () => {
+        scheduler.clearActivePrompt();
+        this.syncMicrophoneSuppressionFromScheduler();
+      },
+    });
+    this.setMicrophoneSuppression(true);
+    scheduler.markPromptStarted(target.id, now, durationMs);
+  }
+
+  private setMicrophoneSuppression(suppressed: boolean): void {
+    if (this.microphoneSuppressed === suppressed) {
+      return;
+    }
+
+    this.microphoneSuppressed = suppressed;
+    gameBridge.publishMicrophoneSuppression({ suppressed });
+  }
+
+  private syncMicrophoneSuppressionFromScheduler(): void {
+    if (this.arenaConfig.mode !== 'pitch') {
+      this.setMicrophoneSuppression(false);
+      return;
+    }
+
+    const active = this.promptScheduler?.isPromptActive(this.time.now) ?? false;
+    this.setMicrophoneSuppression(active);
+  }
+
+  private playPitchPromptGlow(invaderId: string): void {
+    const view = this.invaderViews.get(invaderId);
+    if (!view) {
+      return;
+    }
+
+    const promptRing = this.add.circle(0, 0, INVADER_HALO_RADIUS + 8, PITCH_GLOW_COLOR, 0.32);
+    promptRing.setBlendMode(Phaser.BlendModes.ADD);
+    view.container.addAt(promptRing, 0);
+    view.shell.setStrokeStyle(3, PITCH_GLOW_COLOR, 1);
+
+    this.tweens.add({
+      targets: promptRing,
+      alpha: 0,
+      scaleX: 1.16,
+      scaleY: 1.16,
+      duration: PITCH_GLOW_DURATION_MS,
+      ease: 'Cubic.Out',
+      onComplete: () => {
+        promptRing.destroy();
+        view.shell.setStrokeStyle(2, 0x22d3ee, 0.9);
+      },
+    });
   }
 }

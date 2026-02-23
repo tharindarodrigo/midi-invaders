@@ -10,6 +10,10 @@ export const computeSpawnIntervalMs = (config: ArenaConfig, wave: number): numbe
 };
 
 export const computeMaxInvaders = (config: ArenaConfig, wave: number): number => {
+  if (config.mode === 'pitch') {
+    return config.maxConcurrentInvaders;
+  }
+
   return config.baseMaxInvaders + (wave - 1);
 };
 
@@ -42,6 +46,7 @@ export const buildRadialInvader = ({
   return {
     id,
     note,
+    pattern: [note],
     x,
     y,
     vx: (dx / length) * speed,

@@ -10,9 +10,11 @@ const makeInvader = (
   y: number,
   vx = 0,
   vy = 0,
+  pattern: number[] = [note],
 ): InvaderEntity => ({
   id,
   note,
+  pattern,
   x,
   y,
   vx,
@@ -207,5 +209,64 @@ describe('game state system', () => {
     expect(step.reachedCore).toHaveLength(2);
     expect(system.getState().gameOver).toBe(false);
     expect(system.getState().lives).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('uses ordered multi-note progress and a -25 miss penalty in pitch mode', () => {
+    const config = createArenaConfig(720, 540, 2, {
+      mode: 'pitch',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 100, config.centerY, 0, 0, [60, 62]));
+
+    const progress = system.processNote(60, 100);
+    const miss = system.processNote(65, 200);
+    const afterResetMiss = system.processNote(62, 300);
+    const progressAgain = system.processNote(60, 400);
+    const hit = system.processNote(62, 500);
+
+    expect(progress.kind).toBe('progress');
+    expect(progress.scoreDelta).toBe(0);
+    expect(miss.kind).toBe('miss');
+    expect(miss.scoreDelta).toBe(-25);
+    expect(afterResetMiss.kind).toBe('miss');
+    expect(progressAgain.kind).toBe('progress');
+    expect(hit.kind).toBe('hit');
+    expect(system.getState().score).toBe(50);
+  });
+
+  it('chooses the nearest invader when multiple pitch candidates share the next expected note', () => {
+    const config = createArenaConfig(720, 540, 2, {
+      mode: 'pitch',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(makeInvader('far', 60, config.centerX + 200, config.centerY, 0, 0, [60, 62]));
+    system.addInvaderForTest(makeInvader('near', 60, config.centerX + 80, config.centerY, 0, 0, [60, 64]));
+
+    const progress = system.processNote(60, 100);
+
+    expect(progress.kind).toBe('progress');
+    expect(progress.target?.id).toBe('near');
+  });
+
+  it('resets pitch sequence progress after the sequence window timeout', () => {
+    const config = createArenaConfig(720, 540, 2, {
+      mode: 'pitch',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 120, config.centerY, 0, 0, [60, 62]));
+
+    const progress = system.processNote(60, 100);
+    system.step(1700, 16);
+    const timedOut = system.processNote(62, 1800);
+
+    expect(progress.kind).toBe('progress');
+    expect(timedOut.kind).toBe('miss');
+    expect(timedOut.scoreDelta).toBe(-25);
   });
 });

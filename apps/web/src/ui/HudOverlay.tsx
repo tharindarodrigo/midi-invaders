@@ -87,6 +87,8 @@ export function HudOverlay({
   const lifeUpsEnabled = runningSession
     ? hud.lifeUpsEnabled
     : !(selectedGameMode === 'practice' && selectedLivesMode === 'infinite');
+  const isPitchMode = activeMode === 'pitch';
+  const missPenalty = isPitchMode ? 25 : 50;
   const livesLabel = runningSession && !Number.isFinite(hud.lives) ? '∞' : `${hud.lives}`;
 
   return (
@@ -174,6 +176,7 @@ export function HudOverlay({
       >
         <option value="arcade">Arcade</option>
         <option value="practice">Practice</option>
+        <option value="pitch">Pitch Recognition</option>
       </select>
 
       <label className="input-label" htmlFor="difficulty-level">
@@ -191,6 +194,9 @@ export function HudOverlay({
       </select>
       {selectedGameMode === 'arcade' && selectedDifficulty === 2 ? (
         <p className="status">Level 2 targets span C2-C4. A3-C4 overlap may show in either clef.</p>
+      ) : null}
+      {selectedGameMode === 'pitch' ? (
+        <p className="status">Listen to each invader melody and play it back in order.</p>
       ) : null}
       {selectedGameMode === 'practice' ? (
         <>
@@ -239,7 +245,7 @@ export function HudOverlay({
 
       <hr className="divider" />
 
-      <p>Mode: {activeMode === 'practice' ? 'Practice' : 'Arcade'}</p>
+      <p>Mode: {activeMode === 'practice' ? 'Practice' : activeMode === 'pitch' ? 'Pitch Recognition' : 'Arcade'}</p>
       <p>Scene: {hud.scene}</p>
       <p>Wave: {hud.wave}</p>
       <p>Score: {hud.score}</p>
@@ -248,13 +254,13 @@ export function HudOverlay({
       {lifeUpsEnabled ? (
         <>
           <p>1UP Meter: {hud.lifeScore}/1000</p>
-          <p>Miss penalty: -50 score, -50 1UP meter, +1s freeze</p>
+          <p>Miss penalty: -{missPenalty} score, -{missPenalty} 1UP meter, +1s freeze</p>
           <p>Life-up power-up: center green pulse clears nearest 5 invaders</p>
         </>
       ) : (
         <>
           <p>1UP Meter: Disabled</p>
-          <p>Miss penalty: -50 score, +1s freeze</p>
+          <p>Miss penalty: -{missPenalty} score, +1s freeze</p>
           <p>Infinite-lives practice disables 1UP and pulse power-up.</p>
         </>
       )}

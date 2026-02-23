@@ -6,6 +6,7 @@ import type {
   NoteProcessResult,
 } from '@/types/gameplay';
 import { createLaserShot } from '@/game/systems/combatSystem';
+import { PitchMatcher } from '@/game/systems/pitchMatcher';
 import {
   buildRadialInvader,
   computeMaxInvaders,
@@ -14,7 +15,6 @@ import {
 } from '@/game/systems/radialSpawner';
 import { resolveNearestThreatTarget } from '@/game/systems/targetResolver';
 
-const MISS_PENALTY_POINTS = 50;
 const LIFE_UP_THRESHOLD = 1000;
 const POWER_UP_DESTROY_COUNT = 5;
 
@@ -34,12 +34,14 @@ export class GameStateSystem {
   private nextSpawnAt = 0;
   private invaderSequence = 0;
   private laserSequence = 0;
+  private readonly pitchMatcher: PitchMatcher;
 
   constructor(
     private readonly config: ArenaConfig,
     private readonly random: () => number = Math.random,
   ) {
     this.state = createInitialState(config);
+    this.pitchMatcher = new PitchMatcher(config.sequenceWindowMs);
   }
 
   reset(now: number): void {
@@ -54,6 +56,7 @@ export class GameStateSystem {
     this.state = createInitialState(this.config);
     this.invaderSequence = 0;
     this.laserSequence = 0;
+    this.pitchMatcher.resetAll([]);
 
     if (seedInitialWave) {
       const initialInvaders = computeMaxInvaders(this.config, 1);
@@ -62,6 +65,7 @@ export class GameStateSystem {
       }
     }
 
+    this.pitchMatcher.syncInvaders(this.state.invaders, now);
     this.nextSpawnAt = now + computeSpawnIntervalMs(this.config, this.state.wave);
   }
 
@@ -71,17 +75,11 @@ export class GameStateSystem {
 
   processNote(note: number, now: number): NoteProcessResult {
     if (this.state.gameOver) {
-      return {
-        kind: 'ignored',
-        target: null,
-        laser: null,
-        waveAdvanced: false,
-        scoreDelta: 0,
-        powerUp: {
-          activated: false,
-          destroyedInvaders: [],
-        },
-      };
+      return this.createIgnoredResult();
+    }
+
+    if (this.config.mode === 'pitch') {
+      return this.processPitchNote(note, now);
     }
 
     const resolution = resolveNearestThreatTarget({
@@ -92,13 +90,33 @@ export class GameStateSystem {
     });
 
     if (!resolution.matched || !resolution.target) {
-      this.applyScoreDelta(-MISS_PENALTY_POINTS);
+      return this.processMiss();
+    }
+
+    return this.processHit(resolution.target, now);
+  }
+
+  private processPitchNote(note: number, now: number): NoteProcessResult {
+    this.pitchMatcher.syncInvaders(this.state.invaders, now);
+    const resolution = this.pitchMatcher.matchNote({
+      invaders: this.state.invaders,
+      note,
+      now,
+      centerX: this.config.centerX,
+      centerY: this.config.centerY,
+    });
+
+    if (resolution.kind === 'miss' || !resolution.target) {
+      return this.processMiss();
+    }
+
+    if (resolution.kind === 'progress') {
       return {
-        kind: 'miss',
-        target: null,
+        kind: 'progress',
+        target: resolution.target,
         laser: null,
         waveAdvanced: false,
-        scoreDelta: -MISS_PENALTY_POINTS,
+        scoreDelta: 0,
         powerUp: {
           activated: false,
           destroyedInvaders: [],
@@ -106,7 +124,26 @@ export class GameStateSystem {
       };
     }
 
-    const target = resolution.target;
+    return this.processHit(resolution.target, now);
+  }
+
+  private processMiss(): NoteProcessResult {
+    this.applyScoreDelta(-this.config.missPenaltyPoints);
+    return {
+      kind: 'miss',
+      target: null,
+      laser: null,
+      waveAdvanced: false,
+      scoreDelta: -this.config.missPenaltyPoints,
+      powerUp: {
+        activated: false,
+        destroyedInvaders: [],
+      },
+    };
+  }
+
+  private processHit(target: InvaderEntity, now: number): NoteProcessResult {
+    this.pitchMatcher.removeInvader(target.id);
     this.state.invaders = this.state.invaders.filter((invader) => invader.id !== target.id);
     const scoreDelta = this.config.basePoints;
     const extraLives = this.applyScoreDelta(scoreDelta);
@@ -140,6 +177,20 @@ export class GameStateSystem {
       powerUp: {
         activated: extraLives > 0,
         destroyedInvaders: destroyedByPowerUp,
+      },
+    };
+  }
+
+  private createIgnoredResult(): NoteProcessResult {
+    return {
+      kind: 'ignored',
+      target: null,
+      laser: null,
+      waveAdvanced: false,
+      scoreDelta: 0,
+      powerUp: {
+        activated: false,
+        destroyedInvaders: [],
       },
     };
   }
@@ -183,6 +234,7 @@ export class GameStateSystem {
     const destroyedInvaders = sortedByDistance.slice(0, count);
     const destroyedIds = new Set(destroyedInvaders.map((invader) => invader.id));
     this.state.invaders = this.state.invaders.filter((invader) => !destroyedIds.has(invader.id));
+    this.pitchMatcher.removeInvaders(destroyedInvaders.map((invader) => invader.id));
 
     return destroyedInvaders;
   }
@@ -230,6 +282,8 @@ export class GameStateSystem {
     }
 
     this.state.invaders = survivingInvaders;
+    this.pitchMatcher.removeInvaders(reachedCore.map((invader) => invader.id));
+    this.pitchMatcher.syncInvaders(this.state.invaders, now);
 
     if (this.state.lives <= 0) {
       this.state.gameOver = true;
@@ -257,6 +311,8 @@ export class GameStateSystem {
       this.nextSpawnAt += computeSpawnIntervalMs(this.config, this.state.wave);
     }
 
+    this.pitchMatcher.syncInvaders(this.state.invaders, now);
+
     if (this.state.lives <= 0) {
       this.state.gameOver = true;
     }
@@ -270,15 +326,20 @@ export class GameStateSystem {
   }
 
   addInvaderForTest(invader: InvaderEntity): void {
-    this.state.invaders.push(invader);
+    this.state.invaders.push({
+      ...invader,
+      pattern: invader.pattern.length > 0 ? [...invader.pattern] : [invader.note],
+    });
   }
 
   clearInvadersForTest(): void {
     this.state.invaders = [];
+    this.pitchMatcher.resetAll([]);
   }
 
   private spawnOne(now: number): InvaderEntity {
-    const note = this.config.notePool[Math.floor(this.random() * this.config.notePool.length)];
+    const pattern = this.generatePattern();
+    const note = pattern[0];
     const invader = buildRadialInvader({
       config: this.config,
       id: `invader-${this.invaderSequence}`,
@@ -288,7 +349,25 @@ export class GameStateSystem {
       random: this.random,
     });
 
+    invader.pattern = pattern;
     this.invaderSequence += 1;
     return invader;
+  }
+
+  private generatePattern(): number[] {
+    const notePool = this.config.notePool;
+    const patternLength = Math.max(1, this.config.patternLength);
+    const fallbackNote = notePool[0] ?? 60;
+    if (notePool.length === 0) {
+      return Array.from({ length: patternLength }, () => fallbackNote);
+    }
+
+    const pattern: number[] = [];
+    for (let index = 0; index < patternLength; index += 1) {
+      const note = notePool[Math.floor(this.random() * notePool.length)] ?? fallbackNote;
+      pattern.push(note);
+    }
+
+    return pattern;
   }
 }

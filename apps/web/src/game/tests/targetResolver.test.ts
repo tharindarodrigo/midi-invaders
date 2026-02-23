@@ -5,6 +5,7 @@ import type { InvaderEntity } from '@/types/gameplay';
 const makeInvader = (id: string, note: number, x: number, y: number): InvaderEntity => ({
   id,
   note,
+  pattern: [note],
   x,
   y,
   vx: 0,

@@ -56,4 +56,13 @@ describe('radial spawner', () => {
     expect(wave1).toBe(2100);
     expect(wave20).toBeGreaterThanOrEqual(350);
   });
+
+  it('caps pitch mode concurrent invaders to the configured maximum', () => {
+    const config = createArenaConfig(720, 540, 3, {
+      mode: 'pitch',
+    });
+
+    expect(computeMaxInvaders(config, 1)).toBe(3);
+    expect(computeMaxInvaders(config, 10)).toBe(3);
+  });
 });

@@ -1,5 +1,5 @@
 export type DifficultyLevel = 1 | 2 | 3;
-export type GameMode = 'arcade' | 'practice';
+export type GameMode = 'arcade' | 'practice' | 'pitch';
 export type ClefMode = 'treble' | 'bass' | 'any';
 export type LivesMode = 'default' | 'infinite';
 
@@ -47,7 +47,7 @@ const normalizeLivesMode = (livesMode: string | undefined): LivesMode => {
 };
 
 const normalizeGameMode = (mode: string | undefined): GameMode => {
-  if (mode === 'arcade' || mode === 'practice') {
+  if (mode === 'arcade' || mode === 'practice' || mode === 'pitch') {
     return mode;
   }
 
@@ -97,11 +97,17 @@ export interface ArenaConfig {
   clefMode: ClefMode;
   infiniteLives: boolean;
   lifeUpsEnabled: boolean;
+  missPenaltyPoints: number;
+  promptRepeatMs: number;
+  sequenceWindowMs: number;
+  maxConcurrentInvaders: number;
+  patternLength: number;
 }
 
 export interface InvaderEntity {
   id: string;
   note: number;
+  pattern: number[];
   x: number;
   y: number;
   vx: number;
@@ -137,7 +143,7 @@ export interface TargetResolution {
 }
 
 export interface NoteProcessResult {
-  kind: 'hit' | 'miss' | 'ignored';
+  kind: 'hit' | 'miss' | 'ignored' | 'progress';
   target: InvaderEntity | null;
   laser: LaserShot | null;
   waveAdvanced: boolean;

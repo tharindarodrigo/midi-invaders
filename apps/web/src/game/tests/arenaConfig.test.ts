@@ -55,4 +55,29 @@ describe('arena config difficulty presets', () => {
     expect(practice.lifeUpsEnabled).toBe(false);
     expect(practice.startingLives).toBe(Number.POSITIVE_INFINITY);
   });
+
+  it('builds pitch mode config with level-based pattern length, cap, and miss penalty', () => {
+    const level1 = createArenaConfig(1200, 800, 1, { mode: 'pitch' });
+    const level2 = createArenaConfig(1200, 800, 2, { mode: 'pitch' });
+    const level3 = createArenaConfig(1200, 800, 3, { mode: 'pitch' });
+    const arcadeLevel2 = createArenaConfig(1200, 800, 2, { mode: 'arcade' });
+
+    expect(level1.mode).toBe('pitch');
+    expect(level1.patternLength).toBe(1);
+    expect(level1.maxConcurrentInvaders).toBe(1);
+    expect(level1.missPenaltyPoints).toBe(25);
+
+    expect(level2.patternLength).toBe(2);
+    expect(level2.maxConcurrentInvaders).toBe(1);
+    expect(level3.patternLength).toBe(3);
+    expect(level3.maxConcurrentInvaders).toBe(3);
+    expect(level2.baseInvaderSpeed).toBeLessThan(arcadeLevel2.baseInvaderSpeed);
+    expect(level2.baseSpawnIntervalMs).toBeGreaterThan(arcadeLevel2.baseSpawnIntervalMs);
+    expect(level2.promptRepeatMs).toBeGreaterThan(2200);
+  });
+
+  it('keeps non-pitch mode penalty unchanged', () => {
+    const arcade = createArenaConfig(1200, 800, 1, { mode: 'arcade' });
+    expect(arcade.missPenaltyPoints).toBe(50);
+  });
 });

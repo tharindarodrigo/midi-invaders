@@ -11,6 +11,45 @@ const createNotePool = (start: number, end: number): number[] =>
 const TREBLE_NOTE_POOL = createNotePool(60, 83); // C4..B5
 const BASS_TRAINING_NOTE_POOL = createNotePool(36, 60); // C2..C4
 
+const PITCH_PACING_BY_LEVEL: Record<
+  DifficultyLevel,
+  {
+    speedScale: number;
+    spawnIntervalScale: number;
+    growthScale: number;
+    promptRepeatMs: number;
+    minSpawnIntervalMs: number;
+  }
+> = {
+  1: {
+    speedScale: 0.75,
+    spawnIntervalScale: 1.35,
+    growthScale: 0.8,
+    promptRepeatMs: 2800,
+    minSpawnIntervalMs: 700,
+  },
+  2: {
+    speedScale: 0.55,
+    spawnIntervalScale: 1.65,
+    growthScale: 0.7,
+    promptRepeatMs: 3200,
+    minSpawnIntervalMs: 900,
+  },
+  3: {
+    speedScale: 0.65,
+    spawnIntervalScale: 1.45,
+    growthScale: 0.75,
+    promptRepeatMs: 3000,
+    minSpawnIntervalMs: 800,
+  },
+};
+
+const PITCH_MAX_CONCURRENT_BY_LEVEL: Record<DifficultyLevel, number> = {
+  1: 1,
+  2: 1,
+  3: 3,
+};
+
 export const createArenaConfig = (
   width = 720,
   height = 540,
@@ -59,15 +98,20 @@ export const createArenaConfig = (
   };
 
   const preset = levelPresets[normalizedSettings.difficulty];
+  const pitchPacing = PITCH_PACING_BY_LEVEL[normalizedSettings.difficulty];
 
+  const isPitchMode = normalizedSettings.mode === 'pitch';
   const isPracticeMode = normalizedSettings.mode === 'practice';
   const speedMultiplier = isPracticeMode
     ? normalizeSpeedMultiplier(normalizedSettings.speedMultiplier)
     : 1;
-  const baseInvaderSpeed = preset.baseInvaderSpeed * speedMultiplier;
-  const baseSpawnIntervalMs = Math.round(preset.baseSpawnIntervalMs / speedMultiplier);
-  const invaderSpeedGrowth = 1 + (preset.invaderSpeedGrowth - 1) * speedMultiplier;
-  const spawnIntervalDecay = 1 - (1 - preset.spawnIntervalDecay) * speedMultiplier;
+  const pitchSpeedScale = isPitchMode ? pitchPacing.speedScale : 1;
+  const pitchSpawnIntervalScale = isPitchMode ? pitchPacing.spawnIntervalScale : 1;
+  const pitchGrowthScale = isPitchMode ? pitchPacing.growthScale : 1;
+  const baseInvaderSpeed = preset.baseInvaderSpeed * speedMultiplier * pitchSpeedScale;
+  const baseSpawnIntervalMs = Math.round((preset.baseSpawnIntervalMs / speedMultiplier) * pitchSpawnIntervalScale);
+  const invaderSpeedGrowth = 1 + (preset.invaderSpeedGrowth - 1) * speedMultiplier * pitchGrowthScale;
+  const spawnIntervalDecay = 1 - (1 - preset.spawnIntervalDecay) * speedMultiplier * pitchGrowthScale;
   const clefMode = isPracticeMode
     ? normalizedSettings.clefMode
     : normalizedSettings.difficulty === 2
@@ -77,6 +121,11 @@ export const createArenaConfig = (
   const infiniteLives = isPracticeMode && normalizedSettings.livesMode === 'infinite';
   const lifeUpsEnabled = !infiniteLives;
   const startingLives = infiniteLives ? Number.POSITIVE_INFINITY : 3;
+  const patternLength = isPitchMode ? normalizedSettings.difficulty : 1;
+  const maxConcurrentInvaders = isPitchMode
+    ? PITCH_MAX_CONCURRENT_BY_LEVEL[normalizedSettings.difficulty]
+    : preset.baseMaxInvaders;
+  const missPenaltyPoints = isPitchMode ? 25 : 50;
 
   return {
     width,
@@ -90,7 +139,7 @@ export const createArenaConfig = (
     basePoints: 100,
     baseSpawnIntervalMs,
     spawnIntervalDecay,
-    minSpawnIntervalMs: 350,
+    minSpawnIntervalMs: isPitchMode ? pitchPacing.minSpawnIntervalMs : 350,
     baseInvaderSpeed,
     invaderSpeedGrowth,
     baseMaxInvaders: preset.baseMaxInvaders,
@@ -99,5 +148,10 @@ export const createArenaConfig = (
     clefMode,
     infiniteLives,
     lifeUpsEnabled,
+    missPenaltyPoints,
+    promptRepeatMs: isPitchMode ? pitchPacing.promptRepeatMs : 2200,
+    sequenceWindowMs: 1500,
+    maxConcurrentInvaders,
+    patternLength,
   };
 };

@@ -65,8 +65,13 @@ export default function App() {
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
   const selectedInputModeRef = useRef<'keyboard' | 'midi' | 'microphone'>('keyboard');
   const selectedMidiInputIdRef = useRef<string | null>(null);
+  const microphoneSuppressedRef = useRef(false);
 
   const handleInputEvent = useCallback((event: InputNoteEvent) => {
+    if (event.source === 'microphone' && microphoneSuppressedRef.current) {
+      return;
+    }
+
     if (!shouldProcessInputEvent(selectedInputModeRef.current, selectedMidiInputIdRef.current, event)) {
       return;
     }
@@ -179,6 +184,9 @@ export default function App() {
     keyboardSynthRef.current = keyboardSynth;
 
     const unsubscribeHud = gameBridge.onHud((nextHud) => setHud(nextHud));
+    const unsubscribeMicrophoneSuppression = gameBridge.onMicrophoneSuppression(({ suppressed }) => {
+      microphoneSuppressedRef.current = suppressed;
+    });
     const unsubscribeMidi = midiService.onNoteEvent((event) => handleInputEvent(event));
     const unsubscribeMicrophone = microphoneService.onNoteEvent((event) => handleInputEvent(event));
     const unsubscribeDevices = midiService.onDevicesChanged((devices) => {
@@ -205,6 +213,7 @@ export default function App() {
 
     return () => {
       unsubscribeHud();
+      unsubscribeMicrophoneSuppression();
       unsubscribeMidi();
       unsubscribeMicrophone();
       unsubscribeDevices();
@@ -248,6 +257,12 @@ export default function App() {
       : selectedInputMode === 'midi'
         ? 'MIDI Keyboard'
         : 'Microphone Pitch';
+  const selectedGameModeLabel =
+    selectedGameMode === 'practice'
+      ? 'Practice'
+      : selectedGameMode === 'pitch'
+        ? 'Pitch Recognition'
+        : 'Arcade';
   const startButtonLabel = canStartGame
     ? 'Play'
     : selectedInputMode === 'microphone'
@@ -344,9 +359,15 @@ export default function App() {
           ) : null}
           {hud.scene !== 'game' && hud.scene !== 'game-over' ? (
             <div className="game-instructions" aria-label="How to play">
-              <h2>Play by matching the note shown above each invader</h2>
+              <h2>
+                {selectedGameMode === 'pitch'
+                  ? 'Listen to each invader melody and play it back'
+                  : 'Play by matching the note shown above each invader'}
+              </h2>
               <p>
-                Input Mode: <strong>{selectedInputModeLabel}</strong>. Choose mode below, then press Play.
+                Input Mode: <strong>{selectedInputModeLabel}</strong>. Game Mode: <strong>{selectedGameModeLabel}</strong>.
+                {' '}
+                Choose mode below, then press Play.
               </p>
               <div className="start-mode-switch" aria-label="Input mode switch">
                 <button
@@ -378,7 +399,9 @@ export default function App() {
                     ? 'MIDI mode requires a connected MIDI input device.'
                     : 'Microphone mode requires granting microphone access, then playing clear single pitches.'}
               </p>
-              {selectedGameMode === 'practice' ? (
+              {selectedGameMode === 'pitch' ? (
+                <p>Pitch mode is non-visual: invaders play repeating melodies. No note notation is shown.</p>
+              ) : selectedGameMode === 'practice' ? (
                 <p>Practice mode uses your custom clef, speed, and lives tuner from the left panel.</p>
               ) : selectedDifficulty === 2 ? (
                 <p>Level 2 uses C2-C4 targets with an A3-C4 bass/treble overlap and up to two ledger lines per clef.</p>

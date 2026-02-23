@@ -29,9 +29,9 @@
 - Successful hits now show a floating `+points` popup near the destroyed invader.
 - Difficulty level 1 now starts with one incoming invader and ramps up by wave.
 - Difficulty level 2 now trains bass-clef reading with targets from `C2` to `C4`, including an `A3`-to-`C4` treble/bass overlap for ledger-line practice, while keeping notation within about two ledger lines per clef.
-- Gameplay options now support `Arcade` (preset difficulty) and `Practice` mode with custom clef selection, speed control, and lives mode (`default` vs `infinite`).
+- Gameplay options now support `Arcade` (preset difficulty), `Practice` (custom clef/speed/lives), and `Pitch Recognition` (ear-training, difficulty-only).
 - In `Practice` mode with `infinite` lives, the `1UP` meter and 1000-point pulse power-up are disabled.
-- Wrong notes now apply a `-50` score penalty, show a floating penalty popup, and freeze gameplay for 1 second.
+- Wrong notes now apply a `-50` score penalty in Arcade/Practice, show a floating penalty popup, and freeze gameplay for 1 second.
 - In `Computer Keyboard` mode, turning `CapsLock` on shifts mapped notes down by two octaves for bass-note practice.
 - A separate `1UP` meter grants `+1 life` every 1000 points of meter progress; penalties reduce this meter down to `0` minimum without removing earned lives.
 - On each life-up power-up, a green pulse erupts from center and clears up to the 5 nearest invaders.
@@ -43,11 +43,20 @@
 - In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
 - Microphone pitch note events now require a short stability window (3 consecutive frames, about 50ms) to reduce note jitter from instrument overtones.
 - Computer keyboard mode now plays synthesized note audio on key press/release.
+- In `Pitch Recognition` mode, invaders do not show notation. They play repeating prompts (about `2.8s` to `3.2s`, slower at level 2) and glow purple during playback.
+- `Pitch Recognition` mode uses ordered pitch patterns by difficulty: level 1 = 1 note, level 2 = 2 notes, level 3 = 3 notes.
+- `Pitch Recognition` mode uses a `-25` miss penalty (with the same 1UP/life-up system as other modes).
 
 ### Validation commands
 - `pnpm -r lint`
 - `pnpm -r test`
 - `pnpm -r build`
+
+### Pitch Recognition quick rules
+- Mode is non-visual: invaders keep moving, but note notation is hidden.
+- Prompt playback is single-stream (no overlaps) with round-robin turns across active invaders.
+- Reply patterns are ordered and difficulty-based (`1`, `2`, `3` notes for levels `1`, `2`, `3`).
+- Input can match any active invader; if several match, nearest-to-core wins.
 
 ## 1) High-level concept
 
