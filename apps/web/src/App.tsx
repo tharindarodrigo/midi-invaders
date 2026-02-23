@@ -7,7 +7,17 @@ import { bindKeyboardFallback } from '@/services/keyboardFallback';
 import { KeyboardSynth } from '@/services/keyboardSynth';
 import { MidiService, supportsWebMidi } from '@/services/midi';
 import { getStoredMidiInputId, setStoredMidiInputId } from '@/services/midiPreferences';
-import type { DifficultyLevel } from '@/types/gameplay';
+import {
+  DEFAULT_GAMEPLAY_SETTINGS,
+  normalizeGameplaySettings,
+} from '@/types/gameplay';
+import type {
+  ClefMode,
+  DifficultyLevel,
+  GameMode,
+  GameplaySettings,
+  LivesMode,
+} from '@/types/gameplay';
 import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 import { HudOverlay } from '@/ui/HudOverlay';
@@ -21,6 +31,9 @@ const initialHud: HudState = {
   wave: 1,
   activeInvaders: 0,
   scene: 'menu',
+  mode: 'arcade',
+  infiniteLives: false,
+  lifeUpsEnabled: true,
 };
 
 export default function App() {
@@ -38,7 +51,11 @@ export default function App() {
   const [midiDevices, setMidiDevices] = useState<MidiInputDevice[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
   const [selectedInputMode, setSelectedInputMode] = useState<'keyboard' | 'midi'>('keyboard');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(1);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DEFAULT_GAMEPLAY_SETTINGS.difficulty);
+  const [selectedGameMode, setSelectedGameMode] = useState<GameMode>(DEFAULT_GAMEPLAY_SETTINGS.mode);
+  const [selectedClefMode, setSelectedClefMode] = useState<ClefMode>(DEFAULT_GAMEPLAY_SETTINGS.clefMode);
+  const [selectedSpeedMultiplier, setSelectedSpeedMultiplier] = useState<number>(DEFAULT_GAMEPLAY_SETTINGS.speedMultiplier);
+  const [selectedLivesMode, setSelectedLivesMode] = useState<LivesMode>(DEFAULT_GAMEPLAY_SETTINGS.livesMode);
   const [noteHistory, setNoteHistory] = useState<InputNoteEvent[]>([]);
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
   const selectedInputModeRef = useRef<'keyboard' | 'midi'>('keyboard');
@@ -168,7 +185,31 @@ export default function App() {
   }, [connectMidi]);
 
   const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId);
+  const gameplaySettings = useMemo<GameplaySettings>(
+    () =>
+      normalizeGameplaySettings({
+        difficulty: selectedDifficulty,
+        mode: selectedGameMode,
+        clefMode: selectedClefMode,
+        speedMultiplier: selectedSpeedMultiplier,
+        livesMode: selectedLivesMode,
+      }),
+    [
+      selectedDifficulty,
+      selectedGameMode,
+      selectedClefMode,
+      selectedSpeedMultiplier,
+      selectedLivesMode,
+    ],
+  );
   const selectedInputModeLabel = selectedInputMode === 'keyboard' ? 'Computer Keyboard' : 'MIDI Keyboard';
+  const startGame = useCallback(() => {
+    gameBridge.send({ type: 'start', settings: gameplaySettings });
+  }, [gameplaySettings]);
+  const restartGame = useCallback(() => {
+    gameBridge.send({ type: 'restart', settings: gameplaySettings });
+  }, [gameplaySettings]);
+  const livesLabel = Number.isFinite(hud.lives) ? `${hud.lives}` : '∞';
 
   return (
     <main className="app-root">
@@ -185,7 +226,7 @@ export default function App() {
             onClick={() => {
               canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               if (canStartGame) {
-                gameBridge.send({ type: 'start', difficulty: selectedDifficulty });
+                startGame();
               }
             }}
           >
@@ -214,17 +255,25 @@ export default function App() {
           midiError={midiError}
           midiDevices={midiDevices}
           selectedInputId={selectedInputId}
+          selectedGameMode={selectedGameMode}
           selectedDifficulty={selectedDifficulty}
+          selectedClefMode={selectedClefMode}
+          selectedSpeedMultiplier={selectedSpeedMultiplier}
+          selectedLivesMode={selectedLivesMode}
           noteHistory={noteHistory}
           hud={hud}
           onSelectInputMode={setSelectedInputMode}
           onConnectMidi={connectMidi}
           onSelectMidiInput={handleSelectMidiInput}
+          onSelectGameMode={setSelectedGameMode}
           onSelectDifficulty={setSelectedDifficulty}
+          onSelectClefMode={setSelectedClefMode}
+          onSelectSpeedMultiplier={setSelectedSpeedMultiplier}
+          onSelectLivesMode={setSelectedLivesMode}
           canStart={canStartGame}
-          onStart={() => gameBridge.send({ type: 'start', difficulty: selectedDifficulty })}
+          onStart={startGame}
           onEnd={() => gameBridge.send({ type: 'end' })}
-          onRestart={() => gameBridge.send({ type: 'restart', difficulty: selectedDifficulty })}
+          onRestart={restartGame}
         />
         <section ref={canvasSectionRef} className="game-canvas-shell" aria-label="Game canvas shell">
           <section id={containerId} className="game-canvas" aria-label="Game canvas" />
@@ -233,8 +282,8 @@ export default function App() {
               <h2>Game Over</h2>
               <p className="result-line">Score: {hud.score}</p>
               <p className="result-line">Wave Reached: {hud.wave}</p>
-              <p className="result-line">Lives Remaining: {hud.lives}</p>
-              <button className="game-start-button" onClick={() => gameBridge.send({ type: 'restart', difficulty: selectedDifficulty })}>
+              <p className="result-line">Lives Remaining: {livesLabel}</p>
+              <button className="game-start-button" onClick={restartGame}>
                 Play Again
               </button>
             </div>
@@ -266,8 +315,13 @@ export default function App() {
                   ? 'Keyboard mode is ready now. Use the key map below to play without a MIDI device.'
                   : 'MIDI mode requires a connected MIDI input device.'}
               </p>
-              <svg className="keyboard-svg" viewBox="0 0 420 126" role="img" aria-label="Keyboard guide">
-                <rect x="0" y="0" width="420" height="126" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
+              {selectedGameMode === 'practice' ? (
+                <p>Practice mode uses your custom clef, speed, and lives tuner from the left panel.</p>
+              ) : selectedDifficulty === 2 ? (
+                <p>Level 2 uses C2-C4 targets with an A3-C4 bass/treble overlap and up to two ledger lines per clef.</p>
+              ) : null}
+              <svg className="keyboard-svg" viewBox="0 0 420 146" role="img" aria-label="Keyboard guide">
+                <rect x="0" y="0" width="420" height="146" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
                 <g fill="#f8fafc" stroke="#0f172a" strokeWidth="1.5">
                   <rect x="16" y="12" width="42" height="94" rx="4" />
                   <rect x="58" y="12" width="42" height="94" rx="4" />
@@ -287,14 +341,19 @@ export default function App() {
                   <rect x="255" y="12" width="26" height="58" rx="3" />
                   <rect x="339" y="12" width="26" height="58" rx="3" />
                 </g>
-                <text x="24" y="120" fill="#e2e8f0" fontSize="12">
-                  Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 3 4 6 7 8)
+                <text x="24" y="122" fill="#e2e8f0" fontSize="12">
+                  <tspan x="24" dy="0">
+                    Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 3 4 6 7 8)
+                  </tspan>
+                  <tspan x="24" dy="14">
+                    CapsLock ON: shift keyboard notes down 2 octaves (bass range).
+                  </tspan>
                 </text>
               </svg>
               <button
                 className="game-start-button"
                 disabled={!canStartGame}
-                onClick={() => gameBridge.send({ type: 'start', difficulty: selectedDifficulty })}
+                onClick={startGame}
               >
                 {canStartGame ? 'Play' : 'Connect MIDI to Play'}
               </button>

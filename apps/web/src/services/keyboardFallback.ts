@@ -1,5 +1,7 @@
 import type { InputNoteEvent } from '@/types/input';
 
+const BASS_SHIFT_SEMITONES = -24;
+
 export const KEYBOARD_NOTE_MAP: Record<string, number> = {
   // C4 octave white keys
   z: 60, // C4
@@ -35,11 +37,9 @@ export const createKeyboardFallbackHandler = (
   onNoteOn: (note: number) => void,
 ): ((event: KeyboardEvent) => void) => {
   return (event: KeyboardEvent) => {
-    const key = event.key.toLowerCase();
-    const note = KEYBOARD_NOTE_MAP[key];
-
-    if (typeof note === 'number') {
-      onNoteOn(note);
+    const resolved = resolveKeyboardNote(event);
+    if (resolved) {
+      onNoteOn(resolved.note);
     }
   };
 };
@@ -62,6 +62,22 @@ const hasShortcutModifier = (event: KeyboardEvent): boolean => {
   return event.metaKey || event.ctrlKey || event.altKey;
 };
 
+const hasCapsLockActive = (event: KeyboardEvent): boolean => {
+  return event.getModifierState('CapsLock');
+};
+
+const resolveKeyboardNote = (event: KeyboardEvent): { key: string; note: number } | null => {
+  const key = event.key.toLowerCase();
+  const baseNote = KEYBOARD_NOTE_MAP[key];
+
+  if (typeof baseNote !== 'number') {
+    return null;
+  }
+
+  const note = hasCapsLockActive(event) ? baseNote + BASS_SHIFT_SEMITONES : baseNote;
+  return { key, note };
+};
+
 const toNoteEvent = (
   type: InputNoteEvent['type'],
   note: number,
@@ -79,19 +95,18 @@ const toNoteEvent = (
 });
 
 export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => void): (() => void) => {
-  const activeKeys = new Set<string>();
+  const activeKeys = new Map<string, number>();
 
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat || shouldIgnoreKeyEvent(event) || hasShortcutModifier(event)) {
       return;
     }
 
-    const key = event.key.toLowerCase();
-    const note = KEYBOARD_NOTE_MAP[key];
-
-    if (typeof note !== 'number') {
+    const resolved = resolveKeyboardNote(event);
+    if (!resolved) {
       return;
     }
+    const { key, note } = resolved;
 
     event.preventDefault();
 
@@ -99,7 +114,7 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
       return;
     }
 
-    activeKeys.add(key);
+    activeKeys.set(key, note);
     onNoteEvent(toNoteEvent('note_on', note, key, event.timeStamp));
   };
 
@@ -109,9 +124,7 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
     }
 
     const key = event.key.toLowerCase();
-    const note = KEYBOARD_NOTE_MAP[key];
-
-    if (typeof note !== 'number') {
+    if (typeof KEYBOARD_NOTE_MAP[key] !== 'number') {
       return;
     }
 
@@ -119,7 +132,8 @@ export const bindKeyboardFallback = (onNoteEvent: (event: InputNoteEvent) => voi
       event.preventDefault();
     }
 
-    if (!activeKeys.has(key)) {
+    const note = activeKeys.get(key);
+    if (note === undefined) {
       return;
     }
 

@@ -147,6 +147,11 @@ export class GameStateSystem {
   private applyScoreDelta(scoreDelta: number): number {
     this.state.score += scoreDelta;
 
+    if (!this.config.lifeUpsEnabled) {
+      this.state.lifeScore = 0;
+      return 0;
+    }
+
     const nextLifeScore = this.state.lifeScore + scoreDelta;
     if (nextLifeScore <= 0) {
       this.state.lifeScore = 0;
@@ -220,7 +225,7 @@ export class GameStateSystem {
       }
     }
 
-    if (reachedCore.length > 0) {
+    if (!this.config.infiniteLives && reachedCore.length > 0) {
       this.state.lives = Math.max(0, this.state.lives - reachedCore.length);
     }
 

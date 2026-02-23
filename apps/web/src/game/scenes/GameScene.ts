@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
 import { createArenaConfig } from '@/game/arenaConfig';
 import { gameBridge } from '@/game/gameBridge';
+import { resolveInvaderClef, type StaffClef } from '@/game/notationProfile';
 import { GameStateSystem } from '@/game/systems/gameStateSystem';
 import { renderStaffNoteToCanvas } from '@/services/notation';
-import type { DifficultyLevel, InvaderEntity } from '@/types/gameplay';
+import {
+  DEFAULT_GAMEPLAY_SETTINGS,
+  normalizeGameplaySettings,
+} from '@/types/gameplay';
+import type { GameplaySettings, InvaderEntity } from '@/types/gameplay';
 import type { InputNoteEvent } from '@/types/input';
 
 interface InvaderView {
@@ -18,15 +23,19 @@ interface LaserView {
 
 const NOTATION_TEXTURE_WIDTH = 220;
 const NOTATION_TEXTURE_HEIGHT = 160;
-const NOTATION_TEXTURE_VERSION = 'v7-stem-direction-middle-line';
+const NOTATION_TEXTURE_VERSION = 'v11-staff-raised';
 const NOTATION_SCALE = 1.2;
 const NOTATION_BASE_DISPLAY_WIDTH = 160;
 const NOTATION_BASE_DISPLAY_HEIGHT = 122;
 const NOTATION_DISPLAY_WIDTH = Math.round(NOTATION_BASE_DISPLAY_WIDTH * NOTATION_SCALE);
 const NOTATION_DISPLAY_HEIGHT = Math.round(NOTATION_BASE_DISPLAY_HEIGHT * NOTATION_SCALE);
-const INVADER_FRAME_WIDTH = NOTATION_DISPLAY_WIDTH + 20;
-const INVADER_FRAME_HEIGHT = NOTATION_DISPLAY_HEIGHT + 30;
-const NOTATION_VERTICAL_OFFSET = -Math.round(INVADER_FRAME_HEIGHT * 0.15);
+const INVADER_BODY_RADIUS = Math.round(Math.max(NOTATION_DISPLAY_WIDTH, NOTATION_DISPLAY_HEIGHT) * 0.58);
+const INVADER_INNER_RING_RADIUS = INVADER_BODY_RADIUS - 10;
+const INVADER_HALO_RADIUS = INVADER_BODY_RADIUS + 26;
+const NOTATION_IN_BODY_SCALE = 0.9;
+const NOTATION_IN_BODY_WIDTH = Math.round(NOTATION_DISPLAY_WIDTH * NOTATION_IN_BODY_SCALE);
+const NOTATION_IN_BODY_HEIGHT = Math.round(NOTATION_DISPLAY_HEIGHT * NOTATION_IN_BODY_SCALE);
+const NOTATION_VERTICAL_OFFSET = 0;
 const SCORE_POPUP_DURATION_MS = 620;
 const SCORE_POPUP_RISE_PX = 54;
 const MISS_FREEZE_MS = 1000;
@@ -49,9 +58,14 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  create(data: { difficulty?: DifficultyLevel }): void {
-    const difficulty = data.difficulty ?? 1;
-    this.arenaConfig = createArenaConfig(this.scale.width, this.scale.height, difficulty);
+  create(data: { settings?: GameplaySettings }): void {
+    const gameplaySettings = normalizeGameplaySettings(data.settings ?? DEFAULT_GAMEPLAY_SETTINGS);
+    this.arenaConfig = createArenaConfig(
+      this.scale.width,
+      this.scale.height,
+      gameplaySettings.difficulty,
+      gameplaySettings,
+    );
     this.cameras.main.setBackgroundColor('#030712');
     this.cameras.main.roundPixels = true;
     this.gameState = new GameStateSystem(this.arenaConfig);
@@ -68,7 +82,7 @@ export class GameScene extends Phaser.Scene {
         this.finishGame();
       }
       if (command.type === 'restart') {
-        this.scene.start('GameScene', { difficulty: command.difficulty });
+        this.scene.start('GameScene', { settings: command.settings });
       }
     });
 
@@ -206,11 +220,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderInvader(id: string, note: number, x: number, y: number): void {
-    const notationTextureKey = this.ensureNotationTexture(note);
+    const clef = resolveInvaderClef(this.arenaConfig.clefMode, note, id);
+    const notationTextureKey = this.ensureNotationTexture(note, clef);
 
-    const halo = this.add.circle(0, 0, 98, 0x22d3ee, 0.1);
-    const notationFrame = this.add.rectangle(0, 0, INVADER_FRAME_WIDTH, INVADER_FRAME_HEIGHT, 0x020617, 0.8);
-    notationFrame.setStrokeStyle(2, 0x22d3ee, 0.9);
+    const halo = this.add.circle(0, 0, INVADER_HALO_RADIUS, 0x22d3ee, 0.12);
+    const shell = this.add.circle(0, 0, INVADER_BODY_RADIUS, 0x020617, 0.88);
+    shell.setStrokeStyle(2, 0x22d3ee, 0.9);
+
+    const innerRing = this.add.circle(0, 0, INVADER_INNER_RING_RADIUS, 0x0b1220, 0.32);
+    innerRing.setStrokeStyle(1, 0x38bdf8, 0.72);
 
     const notationSprite = this.add.image(
       0,
@@ -220,14 +238,14 @@ export class GameScene extends Phaser.Scene {
     if (notationTextureKey === '__MISSING') {
       notationSprite.setTint(0x94a3b8);
     }
-    notationSprite.setDisplaySize(NOTATION_DISPLAY_WIDTH, NOTATION_DISPLAY_HEIGHT);
+    notationSprite.setDisplaySize(NOTATION_IN_BODY_WIDTH, NOTATION_IN_BODY_HEIGHT);
 
-    const container = this.add.container(x, y, [halo, notationFrame, notationSprite]);
+    const container = this.add.container(x, y, [halo, shell, innerRing, notationSprite]);
     this.invaderViews.set(id, { container });
   }
 
-  private ensureNotationTexture(note: number): string {
-    const textureKey = `staff-note-${NOTATION_TEXTURE_VERSION}-${note}`;
+  private ensureNotationTexture(note: number, clef: StaffClef): string {
+    const textureKey = `staff-note-${NOTATION_TEXTURE_VERSION}-${clef}-${note}`;
     if (this.textures.exists(textureKey)) {
       return textureKey;
     }
@@ -242,7 +260,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const canvas = canvasTexture.getCanvas();
-    renderStaffNoteToCanvas(canvas, note, { clef: 'treble' });
+    renderStaffNoteToCanvas(canvas, note, { clef });
     canvasTexture.refresh();
 
     return textureKey;
@@ -548,6 +566,9 @@ export class GameScene extends Phaser.Scene {
       wave: state.wave,
       activeInvaders: state.invaders.length,
       scene: 'game',
+      mode: this.arenaConfig.mode,
+      infiniteLives: this.arenaConfig.infiniteLives,
+      lifeUpsEnabled: this.arenaConfig.lifeUpsEnabled,
     });
   }
 

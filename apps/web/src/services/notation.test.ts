@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getStemDirectionForMidi, midiToVexKey } from '@/services/notation';
+import { getCenteredStaveY, getStemDirectionForMidi, midiToVexKey } from '@/services/notation';
 
 describe('midiToVexKey', () => {
   it('maps natural notes correctly', () => {
@@ -22,5 +22,11 @@ describe('getStemDirectionForMidi', () => {
   it('keeps upward stems on and below the treble center line', () => {
     expect(getStemDirectionForMidi(71, 'treble')).toBe(1);
     expect(getStemDirectionForMidi(60, 'treble')).toBe(1);
+  });
+});
+
+describe('getCenteredStaveY', () => {
+  it('applies the upward visual offset for circular-invader centering', () => {
+    expect(getCenteredStaveY(160)).toBe(48);
   });
 });

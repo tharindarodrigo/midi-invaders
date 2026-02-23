@@ -18,4 +18,41 @@ describe('arena config difficulty presets', () => {
     expect(level3.baseMaxInvaders).toBeGreaterThan(level1.baseMaxInvaders);
     expect(level3.baseSpawnIntervalMs).toBeLessThan(level1.baseSpawnIntervalMs);
   });
+
+  it('uses a C2..C4 note pool for level 2 bass-clef training', () => {
+    const level2 = createArenaConfig(1200, 800, 2);
+
+    expect(level2.notePool[0]).toBe(36);
+    expect(level2.notePool[level2.notePool.length - 1]).toBe(60);
+    expect(level2.notePool).toContain(48);
+    expect(level2.notePool).toContain(60);
+  });
+
+  it('keeps level 2 pacing slower with fewer simultaneous invaders', () => {
+    const level2 = createArenaConfig(1200, 800, 2);
+
+    expect(level2.baseInvaderSpeed).toBe(24);
+    expect(level2.baseMaxInvaders).toBe(3);
+    expect(level2.baseSpawnIntervalMs).toBe(1800);
+    expect(level2.spawnIntervalDecay).toBe(0.978);
+  });
+
+  it('builds practice mode config with custom clef range, speed, and infinite lives', () => {
+    const practice = createArenaConfig(1200, 800, 2, {
+      mode: 'practice',
+      clefMode: 'any',
+      speedMultiplier: 0.75,
+      livesMode: 'infinite',
+    });
+
+    expect(practice.mode).toBe('practice');
+    expect(practice.clefMode).toBe('any');
+    expect(practice.notePool[0]).toBe(36);
+    expect(practice.notePool[practice.notePool.length - 1]).toBe(84);
+    expect(practice.baseInvaderSpeed).toBe(18);
+    expect(practice.baseSpawnIntervalMs).toBe(2400);
+    expect(practice.infiniteLives).toBe(true);
+    expect(practice.lifeUpsEnabled).toBe(false);
+    expect(practice.startingLives).toBe(Number.POSITIVE_INFINITY);
+  });
 });

@@ -166,4 +166,46 @@ describe('game state system', () => {
     expect(beforeFreezeRelease.spawned).toHaveLength(0);
     expect(afterFreezeRelease.spawned).toHaveLength(1);
   });
+
+  it('disables life-up meter progress and pulse power-up for infinite-lives practice mode', () => {
+    const config = createArenaConfig(720, 540, 2, {
+      mode: 'practice',
+      clefMode: 'any',
+      speedMultiplier: 1,
+      livesMode: 'infinite',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.getState().lifeScore = 950;
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 100, config.centerY));
+
+    const hit = system.processNote(60, 10);
+
+    expect(hit.kind).toBe('hit');
+    expect(hit.powerUp.activated).toBe(false);
+    expect(hit.powerUp.destroyedInvaders).toHaveLength(0);
+    expect(system.getState().lifeScore).toBe(0);
+    expect(system.getState().lives).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('keeps infinite-lives practice mode running when invaders reach core', () => {
+    const config = createArenaConfig(720, 540, 2, {
+      mode: 'practice',
+      clefMode: 'bass',
+      speedMultiplier: 1,
+      livesMode: 'infinite',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(makeInvader('a', 40, config.centerX + 10, config.centerY));
+    system.addInvaderForTest(makeInvader('b', 41, config.centerX, config.centerY + 10));
+
+    const step = system.step(16, 16);
+
+    expect(step.reachedCore).toHaveLength(2);
+    expect(system.getState().gameOver).toBe(false);
+    expect(system.getState().lives).toBe(Number.POSITIVE_INFINITY);
+  });
 });

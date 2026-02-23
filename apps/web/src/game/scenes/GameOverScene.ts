@@ -34,11 +34,14 @@ export class GameOverScene extends Phaser.Scene {
       wave: 0,
       activeInvaders: 0,
       scene: 'game-over',
+      mode: 'arcade',
+      infiniteLives: false,
+      lifeUpsEnabled: true,
     });
 
     this.unsubscribe = gameBridge.onCommand((command) => {
       if (command.type === 'restart' || command.type === 'start') {
-        this.scene.start('GameScene', { difficulty: command.difficulty });
+        this.scene.start('GameScene', { settings: command.settings });
       }
     });
   }

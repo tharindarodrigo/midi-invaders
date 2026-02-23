@@ -3,6 +3,9 @@ import { Accidental, Formatter, Renderer, Stave, StaveNote } from 'vexflow';
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 const TREBLE_CENTER_LINE_MIDI = 71; // B4
 const BASS_CENTER_LINE_MIDI = 50; // D3
+const STAVE_HEIGHT_PX = 40;
+// Optical centering inside the circular invader reads better with a slight upward shift.
+const STAVE_VISUAL_OFFSET_Y_PX = -34;
 
 export const getStemDirectionForMidi = (
   midiNote: number,
@@ -26,6 +29,10 @@ export const midiToVexKey = (midiNote: number): string => {
   return accidental ? `${letter}${accidental}/${octave}` : `${letter}/${octave}`;
 };
 
+export const getCenteredStaveY = (canvasHeight: number): number => {
+  return Math.round((canvasHeight - STAVE_HEIGHT_PX) / 2 + STAVE_VISUAL_OFFSET_Y_PX);
+};
+
 export const renderStaffNoteToCanvas = (
   canvas: HTMLCanvasElement,
   midiNote: number,
@@ -40,7 +47,7 @@ export const renderStaffNoteToCanvas = (
   const height = canvas.height;
   // Keep enough left room for accidentals and enough vertical room for ledger lines.
   const insetX = 18;
-  const staveY = 44;
+  const staveY = getCenteredStaveY(height);
   const staveWidth = width - insetX * 2;
 
   const renderer = new Renderer(canvas, Renderer.Backends.CANVAS);
@@ -70,6 +77,11 @@ export const renderStaffNoteToCanvas = (
   note.setStyle({
     fillStyle: noteColor,
     strokeStyle: noteColor,
+  });
+  note.setLedgerLineStyle({
+    fillStyle: noteColor,
+    strokeStyle: noteColor,
+    lineWidth: 2,
   });
 
   if (vexKey.includes('#')) {

@@ -1,11 +1,11 @@
 import type { HudState } from '@/types/hud';
-import type { DifficultyLevel } from '@/types/gameplay';
+import type { GameplaySettings } from '@/types/gameplay';
 import type { InputNoteEvent } from '@/types/input';
 
 type GameCommand =
-  | { type: 'start'; difficulty: DifficultyLevel }
+  | { type: 'start'; settings: GameplaySettings }
   | { type: 'end' }
-  | { type: 'restart'; difficulty: DifficultyLevel };
+  | { type: 'restart'; settings: GameplaySettings };
 
 const COMMAND_EVENT = 'game-command';
 const HUD_EVENT = 'hud-update';

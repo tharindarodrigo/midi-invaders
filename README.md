@@ -28,10 +28,16 @@
 - The selected MIDI input is stored and automatically reselected after reload when that device is still connected.
 - Successful hits now show a floating `+points` popup near the destroyed invader.
 - Difficulty level 1 now starts with one incoming invader and ramps up by wave.
+- Difficulty level 2 now trains bass-clef reading with targets from `C2` to `C4`, including an `A3`-to-`C4` treble/bass overlap for ledger-line practice, while keeping notation within about two ledger lines per clef.
+- Gameplay options now support `Arcade` (preset difficulty) and `Practice` mode with custom clef selection, speed control, and lives mode (`default` vs `infinite`).
+- In `Practice` mode with `infinite` lives, the `1UP` meter and 1000-point pulse power-up are disabled.
 - Wrong notes now apply a `-50` score penalty, show a floating penalty popup, and freeze gameplay for 1 second.
+- In `Computer Keyboard` mode, turning `CapsLock` on shifts mapped notes down by two octaves for bass-note practice.
 - A separate `1UP` meter grants `+1 life` every 1000 points of meter progress; penalties reduce this meter down to `0` minimum without removing earned lives.
 - On each life-up power-up, a green pulse erupts from center and clears up to the 5 nearest invaders.
 - Treble staff stems now point downward for notes above the center line.
+- Invaders now use a circular shell style instead of rigid square frames.
+- Staff notation is vertically centered inside circular invaders for clearer alignment.
 - Laser shots now fire as directional red blaster bursts that impact the target, then fade in glow strength.
 - Input mode can now be switched between `Computer Keyboard` and `MIDI Keyboard` from the HUD and start-canvas overlay.
 - Computer keyboard mode now plays synthesized note audio on key press/release.

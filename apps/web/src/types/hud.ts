@@ -1,3 +1,5 @@
+import type { GameMode } from '@/types/gameplay';
+
 export interface HudState {
   score: number;
   lifeScore: number;
@@ -5,4 +7,7 @@ export interface HudState {
   wave: number;
   activeInvaders: number;
   scene: 'menu' | 'game' | 'game-over';
+  mode: GameMode;
+  infiniteLives: boolean;
+  lifeUpsEnabled: boolean;
 }
