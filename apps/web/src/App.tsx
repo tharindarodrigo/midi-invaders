@@ -5,6 +5,7 @@ import { gameBridge } from '@/game/gameBridge';
 import { canStartWithInputMode, shouldProcessInputEvent } from '@/services/inputMode';
 import { bindKeyboardFallback } from '@/services/keyboardFallback';
 import { KeyboardSynth } from '@/services/keyboardSynth';
+import { MicrophonePitchService, supportsMicrophoneInput } from '@/services/microphone';
 import { MidiService, supportsWebMidi } from '@/services/midi';
 import { getStoredMidiInputId, setStoredMidiInputId } from '@/services/midiPreferences';
 import {
@@ -39,18 +40,22 @@ const initialHud: HudState = {
 export default function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const midiServiceRef = useRef<MidiService | null>(null);
+  const microphoneServiceRef = useRef<MicrophonePitchService | null>(null);
   const keyboardSynthRef = useRef<KeyboardSynth | null>(null);
   const canvasSectionRef = useRef<HTMLElement | null>(null);
   const containerId = 'phaser-game';
 
   const midiSupported = useMemo(() => supportsWebMidi(), []);
+  const microphoneSupported = useMemo(() => supportsMicrophoneInput(), []);
 
   const [hud, setHud] = useState<HudState>(initialHud);
   const [midiStatus, setMidiStatus] = useState<'idle' | 'connecting' | 'ready' | 'error'>('idle');
   const [midiError, setMidiError] = useState<string | null>(null);
+  const [microphoneStatus, setMicrophoneStatus] = useState<'idle' | 'connecting' | 'ready' | 'error'>('idle');
+  const [microphoneError, setMicrophoneError] = useState<string | null>(null);
   const [midiDevices, setMidiDevices] = useState<MidiInputDevice[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
-  const [selectedInputMode, setSelectedInputMode] = useState<'keyboard' | 'midi'>('keyboard');
+  const [selectedInputMode, setSelectedInputMode] = useState<'keyboard' | 'midi' | 'microphone'>('keyboard');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DEFAULT_GAMEPLAY_SETTINGS.difficulty);
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>(DEFAULT_GAMEPLAY_SETTINGS.mode);
   const [selectedClefMode, setSelectedClefMode] = useState<ClefMode>(DEFAULT_GAMEPLAY_SETTINGS.clefMode);
@@ -58,7 +63,7 @@ export default function App() {
   const [selectedLivesMode, setSelectedLivesMode] = useState<LivesMode>(DEFAULT_GAMEPLAY_SETTINGS.livesMode);
   const [noteHistory, setNoteHistory] = useState<InputNoteEvent[]>([]);
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
-  const selectedInputModeRef = useRef<'keyboard' | 'midi'>('keyboard');
+  const selectedInputModeRef = useRef<'keyboard' | 'midi' | 'microphone'>('keyboard');
   const selectedMidiInputIdRef = useRef<string | null>(null);
 
   const handleInputEvent = useCallback((event: InputNoteEvent) => {
@@ -108,6 +113,35 @@ export default function App() {
     }
   }, [midiSupported]);
 
+  const connectMicrophone = useCallback(async () => {
+    if (!microphoneSupported) {
+      setMicrophoneStatus('error');
+      setMicrophoneError('Microphone input is unavailable in this browser.');
+      return;
+    }
+
+    const service = microphoneServiceRef.current;
+    if (!service) {
+      return;
+    }
+
+    setMicrophoneStatus('connecting');
+    setMicrophoneError(null);
+
+    try {
+      service.disconnect();
+      await service.connect();
+      setMicrophoneStatus('ready');
+    } catch (error) {
+      setMicrophoneStatus('error');
+      if (error instanceof Error) {
+        setMicrophoneError(error.message);
+      } else {
+        setMicrophoneError('Unable to connect to microphone input.');
+      }
+    }
+  }, [microphoneSupported]);
+
   const handleSelectMidiInput = useCallback((inputId: string) => {
     const service = midiServiceRef.current;
     if (!service) {
@@ -138,12 +172,15 @@ export default function App() {
     gameRef.current = new Phaser.Game(config);
 
     const midiService = new MidiService();
+    const microphoneService = new MicrophonePitchService();
     const keyboardSynth = new KeyboardSynth();
     midiServiceRef.current = midiService;
+    microphoneServiceRef.current = microphoneService;
     keyboardSynthRef.current = keyboardSynth;
 
     const unsubscribeHud = gameBridge.onHud((nextHud) => setHud(nextHud));
     const unsubscribeMidi = midiService.onNoteEvent((event) => handleInputEvent(event));
+    const unsubscribeMicrophone = microphoneService.onNoteEvent((event) => handleInputEvent(event));
     const unsubscribeDevices = midiService.onDevicesChanged((devices) => {
       setMidiDevices(devices);
       const currentSelectedInputId = midiService.getSelectedInputId();
@@ -169,12 +206,15 @@ export default function App() {
     return () => {
       unsubscribeHud();
       unsubscribeMidi();
+      unsubscribeMicrophone();
       unsubscribeDevices();
       unbindKeyboard();
       keyboardSynth.destroy();
       keyboardSynthRef.current = null;
       midiService.disconnect();
       midiServiceRef.current = null;
+      microphoneService.disconnect();
+      microphoneServiceRef.current = null;
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };
@@ -184,7 +224,7 @@ export default function App() {
     void connectMidi();
   }, [connectMidi]);
 
-  const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId);
+  const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId, microphoneStatus);
   const gameplaySettings = useMemo<GameplaySettings>(
     () =>
       normalizeGameplaySettings({
@@ -202,7 +242,12 @@ export default function App() {
       selectedLivesMode,
     ],
   );
-  const selectedInputModeLabel = selectedInputMode === 'keyboard' ? 'Computer Keyboard' : 'MIDI Keyboard';
+  const selectedInputModeLabel =
+    selectedInputMode === 'keyboard'
+      ? 'Computer Keyboard'
+      : selectedInputMode === 'midi'
+        ? 'MIDI Keyboard'
+        : 'Microphone Pitch';
   const startGame = useCallback(() => {
     gameBridge.send({ type: 'start', settings: gameplaySettings });
   }, [gameplaySettings]);
@@ -241,7 +286,7 @@ export default function App() {
         </div>
         <div className="hero-tags" aria-label="Feature highlights">
           <span>Arcade Waves</span>
-          <span>MIDI + Keyboard</span>
+          <span>MIDI + Mic + Keyboard</span>
           <span>Notation Training</span>
           <span>Global Leaderboard</span>
         </div>
@@ -253,6 +298,9 @@ export default function App() {
           midiSupported={midiSupported}
           midiStatus={midiStatus}
           midiError={midiError}
+          microphoneSupported={microphoneSupported}
+          microphoneStatus={microphoneStatus}
+          microphoneError={microphoneError}
           midiDevices={midiDevices}
           selectedInputId={selectedInputId}
           selectedGameMode={selectedGameMode}
@@ -264,6 +312,7 @@ export default function App() {
           hud={hud}
           onSelectInputMode={setSelectedInputMode}
           onConnectMidi={connectMidi}
+          onConnectMicrophone={connectMicrophone}
           onSelectMidiInput={handleSelectMidiInput}
           onSelectGameMode={setSelectedGameMode}
           onSelectDifficulty={setSelectedDifficulty}
@@ -309,11 +358,20 @@ export default function App() {
                 >
                   MIDI Keyboard
                 </button>
+                <button
+                  className={`start-mode-button ${selectedInputMode === 'microphone' ? 'active' : ''}`}
+                  onClick={() => setSelectedInputMode('microphone')}
+                  type="button"
+                >
+                  Microphone Pitch
+                </button>
               </div>
               <p>
                 {selectedInputMode === 'keyboard'
                   ? 'Keyboard mode is ready now. Use the key map below to play without a MIDI device.'
-                  : 'MIDI mode requires a connected MIDI input device.'}
+                  : selectedInputMode === 'midi'
+                    ? 'MIDI mode requires a connected MIDI input device.'
+                    : 'Microphone mode requires granting microphone access, then playing clear single pitches.'}
               </p>
               {selectedGameMode === 'practice' ? (
                 <p>Practice mode uses your custom clef, speed, and lives tuner from the left panel.</p>
@@ -355,7 +413,7 @@ export default function App() {
                 disabled={!canStartGame}
                 onClick={startGame}
               >
-                {canStartGame ? 'Play' : 'Connect MIDI to Play'}
+                {canStartGame ? 'Play' : selectedInputMode === 'microphone' ? 'Connect Microphone to Play' : 'Connect MIDI to Play'}
               </button>
             </div>
           ) : null}

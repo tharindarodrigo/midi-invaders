@@ -1,6 +1,6 @@
 export type NoteEventType = 'note_on' | 'note_off';
 
-export type InputSource = 'midi' | 'keyboard';
+export type InputSource = 'midi' | 'keyboard' | 'microphone';
 
 export interface InputNoteEvent {
   type: NoteEventType;

@@ -4,10 +4,13 @@ import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 
 interface HudOverlayProps {
-  selectedInputMode: 'keyboard' | 'midi';
+  selectedInputMode: 'keyboard' | 'midi' | 'microphone';
   midiSupported: boolean;
   midiStatus: 'idle' | 'connecting' | 'ready' | 'error';
   midiError: string | null;
+  microphoneSupported: boolean;
+  microphoneStatus: 'idle' | 'connecting' | 'ready' | 'error';
+  microphoneError: string | null;
   midiDevices: MidiInputDevice[];
   selectedInputId: string | null;
   selectedGameMode: GameMode;
@@ -17,8 +20,9 @@ interface HudOverlayProps {
   selectedLivesMode: LivesMode;
   noteHistory: InputNoteEvent[];
   hud: HudState;
-  onSelectInputMode: (mode: 'keyboard' | 'midi') => void;
+  onSelectInputMode: (mode: 'keyboard' | 'midi' | 'microphone') => void;
   onConnectMidi: () => void;
+  onConnectMicrophone: () => void;
   onSelectMidiInput: (inputId: string) => void;
   onSelectGameMode: (mode: GameMode) => void;
   onSelectDifficulty: (difficulty: DifficultyLevel) => void;
@@ -52,6 +56,9 @@ export function HudOverlay({
   midiSupported,
   midiStatus,
   midiError,
+  microphoneSupported,
+  microphoneStatus,
+  microphoneError,
   midiDevices,
   selectedInputId,
   selectedGameMode,
@@ -63,6 +70,7 @@ export function HudOverlay({
   hud,
   onSelectInputMode,
   onConnectMidi,
+  onConnectMicrophone,
   onSelectMidiInput,
   onSelectGameMode,
   onSelectDifficulty,
@@ -91,10 +99,11 @@ export function HudOverlay({
         id="input-mode"
         className="device-select"
         value={selectedInputMode}
-        onChange={(event) => onSelectInputMode(event.target.value as 'keyboard' | 'midi')}
+        onChange={(event) => onSelectInputMode(event.target.value as 'keyboard' | 'midi' | 'microphone')}
       >
         <option value="keyboard">Computer Keyboard</option>
         <option value="midi">MIDI Keyboard</option>
+        <option value="microphone">Microphone Pitch</option>
       </select>
 
       {selectedInputMode === 'midi' ? (
@@ -125,6 +134,23 @@ export function HudOverlay({
             </>
           ) : (
             <p className="error">Web MIDI is unavailable in this browser. Switch to Computer Keyboard mode.</p>
+          )}
+        </>
+      ) : selectedInputMode === 'microphone' ? (
+        <>
+          <p className="status">
+            Microphone: {microphoneSupported ? statusLabel(microphoneStatus) : 'Not available'}
+          </p>
+          {microphoneSupported ? (
+            <>
+              <button onClick={onConnectMicrophone} disabled={microphoneStatus === 'connecting'}>
+                {microphoneStatus === 'ready' ? 'Reconnect Microphone' : 'Connect Microphone'}
+              </button>
+              <p>Play a clear single pitch to trigger note matching from your instrument or voice.</p>
+              {microphoneError ? <p className="error">{microphoneError}</p> : null}
+            </>
+          ) : (
+            <p className="error">Microphone input is unavailable in this browser. Switch to Keyboard or MIDI mode.</p>
           )}
         </>
       ) : (

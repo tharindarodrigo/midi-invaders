@@ -39,7 +39,8 @@
 - Invaders now use a circular shell style instead of rigid square frames.
 - Staff notation is vertically centered inside circular invaders for clearer alignment.
 - Laser shots now fire as directional red blaster bursts that impact the target, then fade in glow strength.
-- Input mode can now be switched between `Computer Keyboard` and `MIDI Keyboard` from the HUD and start-canvas overlay.
+- Input mode can now be switched between `Computer Keyboard`, `MIDI Keyboard`, and `Microphone Pitch` from the HUD and start-canvas overlay.
+- In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
 - Computer keyboard mode now plays synthesized note audio on key press/release.
 
 ### Validation commands
