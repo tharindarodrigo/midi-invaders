@@ -699,36 +699,35 @@ export default function App() {
                 <p>Level 2 uses C2-C4 targets with an A3-C4 bass/treble overlap and up to two ledger lines per clef.</p>
               ) : null}
               {selectedInputMode === 'keyboard' ? (
-                <svg className="keyboard-svg" viewBox="0 0 420 146" role="img" aria-label="Keyboard guide">
-                  <rect x="0" y="0" width="420" height="146" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
-                  <g fill="#f8fafc" stroke="#0f172a" strokeWidth="1.5">
-                    <rect x="16" y="12" width="42" height="94" rx="4" />
-                    <rect x="58" y="12" width="42" height="94" rx="4" />
-                    <rect x="100" y="12" width="42" height="94" rx="4" />
-                    <rect x="142" y="12" width="42" height="94" rx="4" />
-                    <rect x="184" y="12" width="42" height="94" rx="4" />
-                    <rect x="226" y="12" width="42" height="94" rx="4" />
-                    <rect x="268" y="12" width="42" height="94" rx="4" />
-                    <rect x="310" y="12" width="42" height="94" rx="4" />
-                    <rect x="352" y="12" width="42" height="94" rx="4" />
-                  </g>
-                  <g fill="#0f172a">
-                    <rect x="45" y="12" width="26" height="58" rx="3" />
-                    <rect x="87" y="12" width="26" height="58" rx="3" />
-                    <rect x="171" y="12" width="26" height="58" rx="3" />
-                    <rect x="213" y="12" width="26" height="58" rx="3" />
-                    <rect x="255" y="12" width="26" height="58" rx="3" />
-                    <rect x="339" y="12" width="26" height="58" rx="3" />
-                  </g>
-                  <text x="24" y="122" fill="#e2e8f0" fontSize="12">
-                    <tspan x="24" dy="0">
-                      Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 3 4 6 7 8)
-                    </tspan>
-                    <tspan x="24" dy="14">
-                      CapsLock ON: shift keyboard notes down 2 octaves (bass range).
-                    </tspan>
-                  </text>
-                </svg>
+                <>
+                  <svg className="keyboard-svg" viewBox="0 0 420 118" role="img" aria-label="Keyboard guide">
+                    <rect x="0" y="0" width="420" height="118" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
+                    <g fill="#f8fafc" stroke="#0f172a" strokeWidth="1.5">
+                      <rect x="16" y="12" width="42" height="94" rx="4" />
+                      <rect x="58" y="12" width="42" height="94" rx="4" />
+                      <rect x="100" y="12" width="42" height="94" rx="4" />
+                      <rect x="142" y="12" width="42" height="94" rx="4" />
+                      <rect x="184" y="12" width="42" height="94" rx="4" />
+                      <rect x="226" y="12" width="42" height="94" rx="4" />
+                      <rect x="268" y="12" width="42" height="94" rx="4" />
+                      <rect x="310" y="12" width="42" height="94" rx="4" />
+                      <rect x="352" y="12" width="42" height="94" rx="4" />
+                    </g>
+                    <g fill="#0f172a">
+                      <rect x="45" y="12" width="26" height="58" rx="3" />
+                      <rect x="87" y="12" width="26" height="58" rx="3" />
+                      <rect x="171" y="12" width="26" height="58" rx="3" />
+                      <rect x="213" y="12" width="26" height="58" rx="3" />
+                      <rect x="255" y="12" width="26" height="58" rx="3" />
+                      <rect x="339" y="12" width="26" height="58" rx="3" />
+                    </g>
+                  </svg>
+                  <div className="keyboard-instructions" aria-label="Keyboard mapping instructions">
+                    <p>Keys: C4 (Z X C V B N M + S D G H J)</p>
+                    <p>Keys: C5 (W E R T Y U I + 3 4 6 7 8)</p>
+                    <p>CapsLock ON shifts notes down 2 octaves (bass range)</p>
+                  </div>
+                </>
               ) : null}
               {selectedInputMode === 'microphone' && microphoneStatus !== 'ready' ? (
                 <button

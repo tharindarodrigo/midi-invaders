@@ -11,6 +11,19 @@ const createNotePool = (start: number, end: number): number[] =>
 const TREBLE_NOTE_POOL = createNotePool(60, 83); // C4..B5
 const BASS_TRAINING_NOTE_POOL = createNotePool(36, 60); // C2..C4
 
+const SPEED_SCALE_REFERENCE_WIDTH = 1200;
+const MIN_VIEWPORT_SPEED_SCALE = 0.72;
+const COMPACT_VIEWPORT_MAX_WIDTH = 960;
+const COMPACT_VIEWPORT_SPEED_SCALE = 0.82;
+
+const resolveViewportSpeedScale = (width: number): number => {
+  if (width >= SPEED_SCALE_REFERENCE_WIDTH) {
+    return 1;
+  }
+
+  return Math.max(MIN_VIEWPORT_SPEED_SCALE, width / SPEED_SCALE_REFERENCE_WIDTH);
+};
+
 const PITCH_PACING_BY_LEVEL: Record<
   DifficultyLevel,
   {
@@ -108,7 +121,17 @@ export const createArenaConfig = (
   const pitchSpeedScale = isPitchMode ? pitchPacing.speedScale : 1;
   const pitchSpawnIntervalScale = isPitchMode ? pitchPacing.spawnIntervalScale : 1;
   const pitchGrowthScale = isPitchMode ? pitchPacing.growthScale : 1;
-  const baseInvaderSpeed = preset.baseInvaderSpeed * speedMultiplier * pitchSpeedScale;
+  // Compact viewports need more reaction time because travel distance is visually compressed.
+  const viewportSpeedScale = resolveViewportSpeedScale(width);
+  const compactViewportScale = width <= COMPACT_VIEWPORT_MAX_WIDTH
+    ? COMPACT_VIEWPORT_SPEED_SCALE
+    : 1;
+  const baseInvaderSpeed =
+    preset.baseInvaderSpeed
+    * speedMultiplier
+    * pitchSpeedScale
+    * viewportSpeedScale
+    * compactViewportScale;
   const baseSpawnIntervalMs = Math.round((preset.baseSpawnIntervalMs / speedMultiplier) * pitchSpawnIntervalScale);
   const invaderSpeedGrowth = 1 + (preset.invaderSpeedGrowth - 1) * speedMultiplier * pitchGrowthScale;
   const spawnIntervalDecay = 1 - (1 - preset.spawnIntervalDecay) * speedMultiplier * pitchGrowthScale;

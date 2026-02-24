@@ -52,11 +52,13 @@
 - Treble staff stems now point downward for notes above the center line.
 - Invaders now use a circular shell style instead of rigid square frames.
 - Staff notation is vertically centered inside circular invaders for clearer alignment.
+- Invader staff notation now scales larger within each invader shell for improved readability.
 - Laser shots now fire as directional red blaster bursts that impact the target, then fade in glow strength.
 - Input mode can now be switched between `Computer Keyboard`, `MIDI Keyboard`, and `Microphone Pitch` from the HUD and start-canvas overlay.
 - On mobile viewports, the default input mode now starts in `Microphone Pitch` when microphone input is supported.
 - The pre-game overlay now includes a direct `Connect Microphone` action for mobile-friendly onboarding before pressing `Play`.
 - Mobile canvas sizing now uses larger gameplay presets and aspect-preserving rendering so invaders remain readable on phones.
+- Invader approach speed now scales down automatically on compact viewports to preserve reaction time.
 - In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
 - Microphone pitch note events now require a short stability window (3 consecutive frames, about 50ms) to reduce note jitter from instrument overtones.
 - Computer keyboard mode now plays synthesized note audio on key press/release.

@@ -37,6 +37,14 @@ describe('arena config difficulty presets', () => {
     expect(level2.spawnIntervalDecay).toBe(0.978);
   });
 
+  it('scales invader speed down on compact viewports', () => {
+    const desktop = createArenaConfig(1200, 800, 1);
+    const compact = createArenaConfig(800, 1120, 1);
+
+    expect(compact.baseInvaderSpeed).toBeLessThan(desktop.baseInvaderSpeed);
+    expect(compact.baseInvaderSpeed).toBeCloseTo(11.808, 5);
+  });
+
   it('builds practice mode config with custom clef range, speed, and infinite lives', () => {
     const practice = createArenaConfig(1200, 800, 2, {
       mode: 'practice',

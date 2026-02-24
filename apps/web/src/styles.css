@@ -182,6 +182,13 @@ body {
 
 .play-shell.gameplay-focus {
   grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.play-shell.gameplay-focus .game-canvas-shell {
+  width: 100%;
+  max-width: 2200px;
+  margin: 0 auto;
 }
 
 .hud-panel-shell.is-hidden {
@@ -370,7 +377,7 @@ button:disabled {
   position: absolute;
   inset: 12px 14px auto;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   pointer-events: none;
   z-index: 6;
 }
@@ -587,8 +594,29 @@ button:disabled {
 }
 
 .keyboard-svg {
-  width: min(560px, 96%);
+  width: min(500px, 100%);
   height: auto;
+}
+
+.keyboard-instructions {
+  width: min(500px, 100%);
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgb(56 189 248 / 38%);
+  border-radius: 10px;
+  background: rgb(15 23 42 / 55%);
+}
+
+.keyboard-instructions p {
+  margin: 0;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #dbeafe;
+}
+
+.keyboard-instructions p + p {
+  margin-top: 4px;
 }
 
 .game-start-button {
@@ -671,6 +699,7 @@ button:disabled {
 
   .game-stats-layer {
     inset: 10px 10px auto;
+    justify-content: center;
   }
 
   .game-stats-panel {
