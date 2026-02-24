@@ -2,6 +2,11 @@ import Phaser from 'phaser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createGameConfig } from '@/game/config';
 import { gameBridge } from '@/game/gameBridge';
+import {
+  isAnalyticsEnabled,
+  setAnalyticsEnabled as setAnalyticsEnabledPreference,
+  trackAnalyticsEvent,
+} from '@/services/analytics';
 import { canStartWithInputMode, shouldProcessInputEvent } from '@/services/inputMode';
 import { bindKeyboardFallback } from '@/services/keyboardFallback';
 import { KeyboardSynth } from '@/services/keyboardSynth';
@@ -19,6 +24,11 @@ import type {
   GameplaySettings,
   LivesMode,
 } from '@/types/gameplay';
+import type {
+  AnalyticsGameEndReason,
+  AnalyticsInputMode,
+  FeedbackLocation,
+} from '@/types/analytics';
 import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 import { HudOverlay } from '@/ui/HudOverlay';
@@ -38,6 +48,15 @@ const initialHud: HudState = {
   lifeUpsEnabled: true,
 };
 
+interface ActiveAnalyticsSession {
+  startedAtMs: number;
+  inputMode: AnalyticsInputMode;
+  settings: GameplaySettings;
+}
+
+const getNowMs = (): number =>
+  typeof performance !== 'undefined' ? performance.now() : Date.now();
+
 export default function App() {
   const gameRef = useRef<Phaser.Game | null>(null);
   const midiServiceRef = useRef<MidiService | null>(null);
@@ -56,17 +75,89 @@ export default function App() {
   const [microphoneError, setMicrophoneError] = useState<string | null>(null);
   const [midiDevices, setMidiDevices] = useState<MidiInputDevice[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
-  const [selectedInputMode, setSelectedInputMode] = useState<'keyboard' | 'midi' | 'microphone'>('keyboard');
+  const [selectedInputMode, setSelectedInputMode] = useState<AnalyticsInputMode>('keyboard');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DEFAULT_GAMEPLAY_SETTINGS.difficulty);
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>(DEFAULT_GAMEPLAY_SETTINGS.mode);
   const [selectedClefMode, setSelectedClefMode] = useState<ClefMode>(DEFAULT_GAMEPLAY_SETTINGS.clefMode);
   const [selectedSpeedMultiplier, setSelectedSpeedMultiplier] = useState<number>(DEFAULT_GAMEPLAY_SETTINGS.speedMultiplier);
   const [selectedLivesMode, setSelectedLivesMode] = useState<LivesMode>(DEFAULT_GAMEPLAY_SETTINGS.livesMode);
+  const [analyticsEnabled, setAnalyticsEnabledState] = useState<boolean>(() => isAnalyticsEnabled());
   const [noteHistory, setNoteHistory] = useState<InputNoteEvent[]>([]);
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
-  const selectedInputModeRef = useRef<'keyboard' | 'midi' | 'microphone'>('keyboard');
+  const selectedInputModeRef = useRef<AnalyticsInputMode>('keyboard');
   const selectedMidiInputIdRef = useRef<string | null>(null);
   const microphoneSuppressedRef = useRef(false);
+  const hudRef = useRef<HudState>(initialHud);
+  const previousHudSceneRef = useRef<HudState['scene']>(initialHud.scene);
+  const lastGameHudRef = useRef<HudState>(initialHud);
+  const activeAnalyticsSessionRef = useRef<ActiveAnalyticsSession | null>(null);
+
+  const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId, microphoneStatus);
+  const gameplaySettings = useMemo<GameplaySettings>(
+    () =>
+      normalizeGameplaySettings({
+        difficulty: selectedDifficulty,
+        mode: selectedGameMode,
+        clefMode: selectedClefMode,
+        speedMultiplier: selectedSpeedMultiplier,
+        livesMode: selectedLivesMode,
+      }),
+    [
+      selectedDifficulty,
+      selectedGameMode,
+      selectedClefMode,
+      selectedSpeedMultiplier,
+      selectedLivesMode,
+    ],
+  );
+
+  const trackGameStarted = useCallback(
+    (trigger: 'start' | 'restart') => {
+      const session: ActiveAnalyticsSession = {
+        startedAtMs: getNowMs(),
+        inputMode: selectedInputMode,
+        settings: gameplaySettings,
+      };
+      activeAnalyticsSessionRef.current = session;
+
+      trackAnalyticsEvent('game_started', {
+        trigger,
+        input_mode: session.inputMode,
+        mode: session.settings.mode,
+        difficulty: session.settings.difficulty,
+        clef_mode: session.settings.clefMode,
+        speed_multiplier: session.settings.speedMultiplier,
+        lives_mode: session.settings.livesMode,
+      });
+    },
+    [gameplaySettings, selectedInputMode],
+  );
+
+  const trackGameEnded = useCallback((reason: AnalyticsGameEndReason, hudSnapshot?: HudState) => {
+    const activeSession = activeAnalyticsSessionRef.current;
+    if (!activeSession) {
+      return;
+    }
+
+    const summary = hudSnapshot ?? hudRef.current;
+    const durationMs = Math.max(0, Math.round(getNowMs() - activeSession.startedAtMs));
+
+    trackAnalyticsEvent('game_ended', {
+      reason,
+      duration_ms: durationMs,
+      score: summary.score,
+      wave: summary.wave,
+      lives: summary.lives,
+      input_mode: activeSession.inputMode,
+      mode: activeSession.settings.mode,
+      difficulty: activeSession.settings.difficulty,
+      clef_mode: activeSession.settings.clefMode,
+      speed_multiplier: activeSession.settings.speedMultiplier,
+      lives_mode: activeSession.settings.livesMode,
+    });
+
+    activeAnalyticsSessionRef.current = null;
+  }, []);
 
   const handleInputEvent = useCallback((event: InputNoteEvent) => {
     if (event.source === 'microphone' && microphoneSuppressedRef.current) {
@@ -83,14 +174,18 @@ export default function App() {
   }, []);
 
   const connectMidi = useCallback(async () => {
+    trackAnalyticsEvent('midi_connect_attempted', {});
+
     if (!midiSupported) {
       setMidiStatus('error');
       setMidiError('Web MIDI is unavailable in this browser.');
+      trackAnalyticsEvent('midi_connect_failed', { error_name: 'unsupported_browser' });
       return;
     }
 
     const service = midiServiceRef.current;
     if (!service) {
+      trackAnalyticsEvent('midi_connect_failed', { error_name: 'service_unavailable' });
       return;
     }
 
@@ -109,25 +204,35 @@ export default function App() {
       setStoredMidiInputId(selectedInputId);
       preferredInputIdRef.current = selectedInputId;
       setMidiStatus('ready');
+      trackAnalyticsEvent('midi_connected', {
+        device_count: devices.length,
+        selected_input_present: Boolean(selectedInputId),
+      });
     } catch (error) {
       setMidiStatus('error');
       if (error instanceof Error) {
         setMidiError(error.message);
+        trackAnalyticsEvent('midi_connect_failed', { error_name: error.name || 'Error' });
       } else {
         setMidiError('Unable to connect to MIDI devices.');
+        trackAnalyticsEvent('midi_connect_failed', { error_name: 'unknown_error' });
       }
     }
   }, [midiSupported]);
 
   const connectMicrophone = useCallback(async () => {
+    trackAnalyticsEvent('microphone_connect_attempted', {});
+
     if (!microphoneSupported) {
       setMicrophoneStatus('error');
       setMicrophoneError('Microphone input is unavailable in this browser.');
+      trackAnalyticsEvent('microphone_connect_failed', { error_name: 'unsupported_browser' });
       return;
     }
 
     const service = microphoneServiceRef.current;
     if (!service) {
+      trackAnalyticsEvent('microphone_connect_failed', { error_name: 'service_unavailable' });
       return;
     }
 
@@ -138,12 +243,15 @@ export default function App() {
       service.disconnect();
       await service.connect();
       setMicrophoneStatus('ready');
+      trackAnalyticsEvent('microphone_connected', {});
     } catch (error) {
       setMicrophoneStatus('error');
       if (error instanceof Error) {
         setMicrophoneError(error.message);
+        trackAnalyticsEvent('microphone_connect_failed', { error_name: error.name || 'Error' });
       } else {
         setMicrophoneError('Unable to connect to microphone input.');
+        trackAnalyticsEvent('microphone_connect_failed', { error_name: 'unknown_error' });
       }
     }
   }, [microphoneSupported]);
@@ -160,6 +268,50 @@ export default function App() {
     preferredInputIdRef.current = selected?.id ?? null;
   }, []);
 
+  const handleSelectInputMode = useCallback((nextMode: AnalyticsInputMode) => {
+    setSelectedInputMode((previousMode) => {
+      if (previousMode !== nextMode) {
+        trackAnalyticsEvent('input_mode_selected', {
+          input_mode: nextMode,
+          previous_input_mode: previousMode,
+          scene: hudRef.current.scene,
+        });
+      }
+
+      return nextMode;
+    });
+  }, []);
+
+  const handleToggleAnalytics = useCallback((enabled: boolean) => {
+    const wasEnabled = isAnalyticsEnabled();
+    if (wasEnabled === enabled) {
+      setAnalyticsEnabledPreference(enabled);
+      setAnalyticsEnabledState(enabled);
+      return;
+    }
+
+    if (!enabled) {
+      trackAnalyticsEvent('analytics_preference_changed', {
+        enabled: false,
+        source: 'hud_toggle',
+      });
+      setAnalyticsEnabledPreference(false);
+      setAnalyticsEnabledState(false);
+      return;
+    }
+
+    setAnalyticsEnabledPreference(true);
+    setAnalyticsEnabledState(true);
+    trackAnalyticsEvent('analytics_preference_changed', {
+      enabled: true,
+      source: 'hud_toggle',
+    });
+  }, []);
+
+  const handleFeedbackFormOpen = useCallback((location: FeedbackLocation) => {
+    trackAnalyticsEvent('feedback_form_opened', { location });
+  }, []);
+
   useEffect(() => {
     selectedInputModeRef.current = selectedInputMode;
     setNoteHistory([]);
@@ -172,6 +324,20 @@ export default function App() {
   useEffect(() => {
     selectedMidiInputIdRef.current = selectedInputId;
   }, [selectedInputId]);
+
+  useEffect(() => {
+    hudRef.current = hud;
+    if (hud.scene === 'game') {
+      lastGameHudRef.current = hud;
+    }
+
+    const previousScene = previousHudSceneRef.current;
+    if (previousScene === 'game' && hud.scene === 'game-over') {
+      trackGameEnded('game_over', lastGameHudRef.current);
+    }
+
+    previousHudSceneRef.current = hud.scene;
+  }, [hud, trackGameEnded]);
 
   useEffect(() => {
     const config = createGameConfig(containerId);
@@ -227,6 +393,7 @@ export default function App() {
       microphoneServiceRef.current = null;
       gameRef.current?.destroy(true);
       gameRef.current = null;
+      activeAnalyticsSessionRef.current = null;
     };
   }, [handleInputEvent]);
 
@@ -234,24 +401,35 @@ export default function App() {
     void connectMidi();
   }, [connectMidi]);
 
-  const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId, microphoneStatus);
-  const gameplaySettings = useMemo<GameplaySettings>(
-    () =>
-      normalizeGameplaySettings({
-        difficulty: selectedDifficulty,
-        mode: selectedGameMode,
-        clefMode: selectedClefMode,
-        speedMultiplier: selectedSpeedMultiplier,
-        livesMode: selectedLivesMode,
-      }),
-    [
-      selectedDifficulty,
-      selectedGameMode,
-      selectedClefMode,
-      selectedSpeedMultiplier,
-      selectedLivesMode,
-    ],
-  );
+  const startGame = useCallback(() => {
+    if (hudRef.current.scene !== 'game') {
+      trackGameStarted('start');
+    }
+
+    gameBridge.send({ type: 'start', settings: gameplaySettings });
+  }, [gameplaySettings, trackGameStarted]);
+
+  const restartGame = useCallback(() => {
+    const currentScene = hudRef.current.scene;
+    if (currentScene === 'game') {
+      trackGameEnded('restart', lastGameHudRef.current);
+    }
+
+    if (currentScene === 'game' || currentScene === 'game-over') {
+      trackGameStarted('restart');
+    }
+
+    gameBridge.send({ type: 'restart', settings: gameplaySettings });
+  }, [gameplaySettings, trackGameEnded, trackGameStarted]);
+
+  const endGame = useCallback(() => {
+    if (hudRef.current.scene === 'game') {
+      trackGameEnded('manual_end', lastGameHudRef.current);
+    }
+
+    gameBridge.send({ type: 'end' });
+  }, [trackGameEnded]);
+
   const selectedInputModeLabel =
     selectedInputMode === 'keyboard'
       ? 'Computer Keyboard'
@@ -269,12 +447,6 @@ export default function App() {
     : selectedInputMode === 'microphone'
       ? 'Connect Microphone to Play'
       : 'Connect MIDI to Play';
-  const startGame = useCallback(() => {
-    gameBridge.send({ type: 'start', settings: gameplaySettings });
-  }, [gameplaySettings]);
-  const restartGame = useCallback(() => {
-    gameBridge.send({ type: 'restart', settings: gameplaySettings });
-  }, [gameplaySettings]);
   const livesLabel = Number.isFinite(hud.lives) ? `${hud.lives}` : '∞';
 
   return (
@@ -331,7 +503,8 @@ export default function App() {
           selectedLivesMode={selectedLivesMode}
           noteHistory={noteHistory}
           hud={hud}
-          onSelectInputMode={setSelectedInputMode}
+          analyticsEnabled={analyticsEnabled}
+          onSelectInputMode={handleSelectInputMode}
           onConnectMidi={connectMidi}
           onConnectMicrophone={connectMicrophone}
           onSelectMidiInput={handleSelectMidiInput}
@@ -340,9 +513,11 @@ export default function App() {
           onSelectClefMode={setSelectedClefMode}
           onSelectSpeedMultiplier={setSelectedSpeedMultiplier}
           onSelectLivesMode={setSelectedLivesMode}
+          onToggleAnalytics={handleToggleAnalytics}
+          onFeedbackLinkClick={handleFeedbackFormOpen}
           canStart={canStartGame}
           onStart={startGame}
-          onEnd={() => gameBridge.send({ type: 'end' })}
+          onEnd={endGame}
           onRestart={restartGame}
           feedbackFormUrl={FEEDBACK_FORM_URL}
         />
@@ -359,6 +534,7 @@ export default function App() {
                 href={FEEDBACK_FORM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => handleFeedbackFormOpen('game_over')}
               >
                 Share Feedback
               </a>
@@ -382,21 +558,21 @@ export default function App() {
               <div className="start-mode-switch" aria-label="Input mode switch">
                 <button
                   className={`start-mode-button ${selectedInputMode === 'keyboard' ? 'active' : ''}`}
-                  onClick={() => setSelectedInputMode('keyboard')}
+                  onClick={() => handleSelectInputMode('keyboard')}
                   type="button"
                 >
                   Computer Keyboard
                 </button>
                 <button
                   className={`start-mode-button ${selectedInputMode === 'midi' ? 'active' : ''}`}
-                  onClick={() => setSelectedInputMode('midi')}
+                  onClick={() => handleSelectInputMode('midi')}
                   type="button"
                 >
                   MIDI Keyboard
                 </button>
                 <button
                   className={`start-mode-button ${selectedInputMode === 'microphone' ? 'active' : ''}`}
-                  onClick={() => setSelectedInputMode('microphone')}
+                  onClick={() => handleSelectInputMode('microphone')}
                   type="button"
                 >
                   Microphone Pitch

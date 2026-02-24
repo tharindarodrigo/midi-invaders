@@ -38,6 +38,7 @@ sudo sed -i "s|root \\* /opt/midi-invaders/apps/web/dist|root * ${APP_DIR}/apps/
 
 sudo mkdir -p /etc/midi-invaders
 echo "Create /etc/midi-invaders/api.env with DATABASE_URL, PORT=3001, HOST=127.0.0.1"
+echo "Optional: create /etc/midi-invaders/web.env with VITE_POSTHOG_KEY and VITE_POSTHOG_HOST for web analytics."
 
 sudo systemctl daemon-reload
 sudo systemctl enable caddy

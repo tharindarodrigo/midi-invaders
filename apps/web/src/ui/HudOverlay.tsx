@@ -1,10 +1,11 @@
 import type { ClefMode, DifficultyLevel, GameMode, LivesMode } from '@/types/gameplay';
 import { noteNumberToName } from '@/services/note';
+import type { AnalyticsInputMode, FeedbackLocation } from '@/types/analytics';
 import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 
 interface HudOverlayProps {
-  selectedInputMode: 'keyboard' | 'midi' | 'microphone';
+  selectedInputMode: AnalyticsInputMode;
   midiSupported: boolean;
   midiStatus: 'idle' | 'connecting' | 'ready' | 'error';
   midiError: string | null;
@@ -20,7 +21,8 @@ interface HudOverlayProps {
   selectedLivesMode: LivesMode;
   noteHistory: InputNoteEvent[];
   hud: HudState;
-  onSelectInputMode: (mode: 'keyboard' | 'midi' | 'microphone') => void;
+  analyticsEnabled: boolean;
+  onSelectInputMode: (mode: AnalyticsInputMode) => void;
   onConnectMidi: () => void;
   onConnectMicrophone: () => void;
   onSelectMidiInput: (inputId: string) => void;
@@ -29,6 +31,8 @@ interface HudOverlayProps {
   onSelectClefMode: (clefMode: ClefMode) => void;
   onSelectSpeedMultiplier: (multiplier: number) => void;
   onSelectLivesMode: (livesMode: LivesMode) => void;
+  onToggleAnalytics: (enabled: boolean) => void;
+  onFeedbackLinkClick: (location: FeedbackLocation) => void;
   canStart: boolean;
   onStart: () => void;
   onEnd: () => void;
@@ -69,6 +73,7 @@ export function HudOverlay({
   selectedLivesMode,
   noteHistory,
   hud,
+  analyticsEnabled,
   onSelectInputMode,
   onConnectMidi,
   onConnectMicrophone,
@@ -78,6 +83,8 @@ export function HudOverlay({
   onSelectClefMode,
   onSelectSpeedMultiplier,
   onSelectLivesMode,
+  onToggleAnalytics,
+  onFeedbackLinkClick,
   canStart,
   onStart,
   onEnd,
@@ -103,7 +110,7 @@ export function HudOverlay({
         id="input-mode"
         className="device-select"
         value={selectedInputMode}
-        onChange={(event) => onSelectInputMode(event.target.value as 'keyboard' | 'midi' | 'microphone')}
+        onChange={(event) => onSelectInputMode(event.target.value as AnalyticsInputMode)}
       >
         <option value="keyboard">Computer Keyboard</option>
         <option value="midi">MIDI Keyboard</option>
@@ -246,6 +253,15 @@ export function HudOverlay({
       ) : null}
 
       <hr className="divider" />
+      <label className="analytics-toggle">
+        <input
+          type="checkbox"
+          checked={analyticsEnabled}
+          onChange={(event) => onToggleAnalytics(event.target.checked)}
+        />
+        <span>Enable anonymous analytics</span>
+      </label>
+      <p className="analytics-note">Helps improve gameplay balance and onboarding. No personal data is tracked.</p>
 
       <p>Mode: {activeMode === 'practice' ? 'Practice' : activeMode === 'pitch' ? 'Pitch Recognition' : 'Arcade'}</p>
       <p>Scene: {hud.scene}</p>
@@ -290,6 +306,7 @@ export function HudOverlay({
         href={feedbackFormUrl}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => onFeedbackLinkClick('hud')}
       >
         Feedback Form
       </a>

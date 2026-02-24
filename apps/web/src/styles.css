@@ -206,6 +206,24 @@ body {
   margin: 14px 0;
 }
 
+.analytics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #ddd6fe;
+}
+
+.analytics-toggle input {
+  margin: 0;
+}
+
+.analytics-note {
+  margin: 6px 0 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
 .subheading {
   margin: 14px 0 8px;
   font-size: 16px;

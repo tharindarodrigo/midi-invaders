@@ -6,6 +6,9 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DEFAULT_API_ENV_FILE="/etc/midi-invaders/api.env"
 FALLBACK_API_ENV_FILE="${REPO_ROOT}/apps/api/.env"
 API_ENV_FILE="${API_ENV_FILE:-${DEFAULT_API_ENV_FILE}}"
+DEFAULT_WEB_ENV_FILE="/etc/midi-invaders/web.env"
+FALLBACK_WEB_ENV_FILE="${REPO_ROOT}/apps/web/.env"
+WEB_ENV_FILE="${WEB_ENV_FILE:-${DEFAULT_WEB_ENV_FILE}}"
 
 cd "${REPO_ROOT}"
 
@@ -59,6 +62,22 @@ fi
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "[manual-deploy] Error: DATABASE_URL is not set after loading API env."
   exit 1
+fi
+
+if [[ -f "${WEB_ENV_FILE}" ]]; then
+  echo "[manual-deploy] Loading web environment from ${WEB_ENV_FILE}"
+  set -a
+  # shellcheck disable=SC1090
+  source "${WEB_ENV_FILE}"
+  set +a
+elif [[ -f "${FALLBACK_WEB_ENV_FILE}" ]]; then
+  echo "[manual-deploy] Warning: ${WEB_ENV_FILE} not found. Falling back to ${FALLBACK_WEB_ENV_FILE}"
+  set -a
+  # shellcheck disable=SC1090
+  source "${FALLBACK_WEB_ENV_FILE}"
+  set +a
+else
+  echo "[manual-deploy] Web env not found. Continuing without frontend VITE_* overrides."
 fi
 
 echo "[manual-deploy] Installing dependencies..."

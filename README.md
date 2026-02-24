@@ -15,6 +15,17 @@
 5. `pnpm -C apps/web dev` (web client on Vite)
 6. `pnpm -C apps/api dev` (API on `http://localhost:3001`)
 
+### Web analytics (optional)
+1. `cp apps/web/.env.example apps/web/.env`
+2. Set `VITE_POSTHOG_KEY` (leave blank to disable analytics).
+3. Optional: set `VITE_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`).
+4. Analytics events are sent only for production builds when a PostHog key is configured and analytics is enabled.
+5. Default preference respects browser Do Not Track (`navigator.doNotTrack === "1"` disables tracking unless user enables it in the HUD).
+6. Phase 1 analytics are anonymous and exclude personal identifiers.
+
+### Community
+- Join us on Discord: https://discord.gg/7Z6EWPJk
+
 ### MIDI hardware test (DGX-670)
 1. Connect Yamaha DGX-670 to your machine over USB.
 2. Open the web client in a Chromium browser.

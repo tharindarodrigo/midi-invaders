@@ -69,11 +69,15 @@ jobs:
 
       - name: Run remote deploy
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           password: ${{ secrets.DEPLOY_PASSWORD }}
+          envs: VITE_POSTHOG_KEY,VITE_POSTHOG_HOST
           script: |
             set -euo pipefail
             cd "${{ secrets.DEPLOY_PATH }}"

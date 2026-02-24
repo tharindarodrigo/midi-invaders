@@ -38,6 +38,15 @@ HOST=127.0.0.1
 EOF
 ```
 
+Optional: create web env file for analytics-enabled frontend builds:
+
+```bash
+sudo tee /etc/midi-invaders/web.env >/dev/null <<'EOF'
+VITE_POSTHOG_KEY=phc_your_key_here
+VITE_POSTHOG_HOST=https://us.i.posthog.com
+EOF
+```
+
 Create DB:
 
 ```bash
@@ -71,6 +80,8 @@ Add repository secrets:
 - `DEPLOY_SSH_KEY`: private key content used by GitHub Actions (recommended)
 - `DEPLOY_PASSWORD`: SSH password (optional fallback if no key is configured)
 - `DEPLOY_PATH`: deploy directory on VM (example: `/opt/midi-invaders`)
+- `VITE_POSTHOG_KEY` (optional): PostHog project API key for production web builds
+- `VITE_POSTHOG_HOST` (optional): PostHog host for production web builds (default `https://us.i.posthog.com`)
 
 Notes:
 - Configure at least one authentication secret: `DEPLOY_SSH_KEY` or `DEPLOY_PASSWORD`.
@@ -111,6 +122,7 @@ The script performs:
 5. `sudo systemctl reload caddy`
 
 It loads API env from `/etc/midi-invaders/api.env` (preferred), or falls back to `apps/api/.env` if present.
+It also loads web env from `/etc/midi-invaders/web.env` (preferred), or falls back to `apps/web/.env` if present.
 It also warns if `midi-invaders-api` or Caddy are still configured to serve from a different directory.
 
 ## 5) Health checks
