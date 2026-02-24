@@ -843,7 +843,7 @@ export default function App() {
                       readOnly
                     />
                     {feedbackFormMessage ? (
-                      <p className={`feedback-form-status ${feedbackFormStatus === 'success' ? 'is-success' : 'is-error'}`}>
+                      <p className={`feedback-form-status ${feedbackFormStatus === 'error' ? 'is-error' : ''}`}>
                         {feedbackFormMessage}
                       </p>
                     ) : null}
