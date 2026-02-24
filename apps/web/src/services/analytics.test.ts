@@ -18,16 +18,35 @@ const setDoNotTrack = (value: string | undefined): void => {
   });
 };
 
+const setNavigatorLanguage = (value: string): void => {
+  Object.defineProperty(window.navigator, 'language', {
+    configurable: true,
+    value,
+  });
+};
+
+const setTimeZone = (value: string): void => {
+  vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(
+    () =>
+      ({
+        resolvedOptions: () => ({ timeZone: value }),
+      }) as Intl.DateTimeFormat,
+  );
+};
+
 describe('analytics service', () => {
   beforeEach(() => {
     vi.resetModules();
     window.localStorage.clear();
     setDoNotTrack(undefined);
+    setNavigatorLanguage('en-US');
+    setTimeZone('America/New_York');
     vi.clearAllMocks();
   });
 
   afterEach(() => {
     setDoNotTrack(undefined);
+    vi.restoreAllMocks();
   });
 
   it('does not capture when init is skipped or disabled by environment', async () => {
@@ -67,7 +86,12 @@ describe('analytics service', () => {
     });
     expect(posthogMock.capture).toHaveBeenCalledWith(
       'app_loaded',
-      expect.objectContaining({ path: '/', is_dnt: false }),
+      expect.objectContaining({
+        path: '/',
+        is_dnt: false,
+        timezone: 'America/New_York',
+        locale: 'en-US',
+      }),
     );
   });
 
@@ -101,7 +125,11 @@ describe('analytics service', () => {
     expect(posthogMock.opt_in_capturing).toHaveBeenCalled();
     expect(posthogMock.capture).toHaveBeenCalledWith(
       'app_loaded',
-      expect.objectContaining({ is_dnt: true }),
+      expect.objectContaining({
+        is_dnt: true,
+        timezone: 'America/New_York',
+        locale: 'en-US',
+      }),
     );
   });
 
@@ -123,6 +151,12 @@ describe('analytics service', () => {
     analytics.setAnalyticsEnabled(true);
     analytics.trackAnalyticsEvent('microphone_connect_attempted', {});
     expect(posthogMock.opt_in_capturing).toHaveBeenCalled();
-    expect(posthogMock.capture).toHaveBeenCalledWith('microphone_connect_attempted', {});
+    expect(posthogMock.capture).toHaveBeenCalledWith(
+      'microphone_connect_attempted',
+      expect.objectContaining({
+        timezone: 'America/New_York',
+        locale: 'en-US',
+      }),
+    );
   });
 });

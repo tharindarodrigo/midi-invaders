@@ -25,6 +25,19 @@ const isDoNotTrackEnabled = (): boolean => {
   return navigator.doNotTrack === '1' || navigator.doNotTrack === 'yes';
 };
 
+const getAnalyticsContext = (): { timezone: string; locale: string } => {
+  const timezone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown';
+    } catch {
+      return 'unknown';
+    }
+  })();
+
+  const locale = typeof navigator !== 'undefined' ? navigator.language || 'unknown' : 'unknown';
+  return { timezone, locale };
+};
+
 export const initAnalytics = ({ apiKey, apiHost, isProduction }: InitAnalyticsOptions): void => {
   if (analyticsInitialized) {
     return;
@@ -67,7 +80,7 @@ export const trackAnalyticsEvent = <T extends AnalyticsEventName>(
     return;
   }
 
-  posthog.capture(eventName, props);
+  posthog.capture(eventName, { ...props, ...getAnalyticsContext() });
 };
 
 export const isAnalyticsEnabled = (): boolean => analyticsEnabled;
