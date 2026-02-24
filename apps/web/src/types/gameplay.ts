@@ -102,6 +102,7 @@ export interface ArenaConfig {
   sequenceWindowMs: number;
   maxConcurrentInvaders: number;
   patternLength: number;
+  maxArcadeWaves: number | null;
 }
 
 export interface InvaderEntity {

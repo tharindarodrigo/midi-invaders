@@ -162,11 +162,38 @@ describe('game state system', () => {
 
     system.delayTimersForFreeze(1000);
 
-    const beforeFreezeRelease = system.step(2100, 16);
-    const afterFreezeRelease = system.step(3100, 16);
+    const beforeFreezeRelease = system.step(3000, 16);
+    const afterFreezeRelease = system.step(4000, 16);
 
     expect(beforeFreezeRelease.spawned).toHaveLength(0);
     expect(afterFreezeRelease.spawned).toHaveLength(1);
+  });
+
+  it('ends arcade mode after the configured final wave is completed and cleared', () => {
+    const config = {
+      ...createArenaConfig(720, 540, 1, {
+        mode: 'arcade',
+      }),
+      maxArcadeWaves: 2,
+    };
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(makeInvader('w1', 60, config.centerX + 120, config.centerY));
+    system.processNote(60, 100);
+    expect(system.getState().wave).toBe(2);
+
+    system.addInvaderForTest(makeInvader('w2a', 61, config.centerX + 120, config.centerY));
+    system.addInvaderForTest(makeInvader('w2b', 62, config.centerX + 140, config.centerY));
+    system.processNote(61, 200);
+    const finalHit = system.processNote(62, 300);
+    const step = system.step(5000, 16);
+
+    expect(finalHit.kind).toBe('hit');
+    expect(step.spawned).toHaveLength(0);
+    expect(step.gameOver).toBe(true);
+    expect(system.getState().gameOver).toBe(true);
+    expect(system.getState().lives).toBe(config.startingLives);
   });
 
   it('disables life-up meter progress and pulse power-up for infinite-lives practice mode', () => {

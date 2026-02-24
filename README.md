@@ -40,7 +40,7 @@
 - The game canvas now shows a keyboard SVG and quick instructions before gameplay starts.
 - The selected MIDI input is stored and automatically reselected after reload when that device is still connected.
 - Successful hits now show a floating `+points` popup near the destroyed invader.
-- Difficulty level 1 now starts with one incoming invader and ramps up by wave.
+- Difficulty level 1 now starts with one incoming invader, uses a slower spawn cadence, and ramps pressure more gently.
 - Difficulty level 2 now trains bass-clef reading with targets from `C2` to `C4`, including an `A3`-to-`C4` treble/bass overlap for ledger-line practice, while keeping notation within about two ledger lines per clef.
 - Gameplay options now support `Arcade` (preset difficulty), `Practice` (custom clef/speed/lives), and `Pitch Recognition` (ear-training, difficulty-only).
 - In `Practice` mode with `infinite` lives, the `1UP` meter and 1000-point pulse power-up are disabled.
@@ -58,7 +58,8 @@
 - On mobile viewports, the default input mode now starts in `Microphone Pitch` when microphone input is supported.
 - The pre-game overlay now includes a direct `Connect Microphone` action for mobile-friendly onboarding before pressing `Play`.
 - Mobile canvas sizing now uses larger gameplay presets and aspect-preserving rendering so invaders remain readable on phones.
-- Invader approach speed now scales down automatically on compact viewports to preserve reaction time.
+- Invader approach speed now scales by arena travel distance so time-to-center stays consistent across screen sizes.
+- Arcade mode now keeps invader travel speed constant within a run and ends after a finite wave cap per difficulty.
 - In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
 - Microphone pitch note events now require a short stability window (3 consecutive frames, about 50ms) to reduce note jitter from instrument overtones.
 - Computer keyboard mode now plays synthesized note audio on key press/release.

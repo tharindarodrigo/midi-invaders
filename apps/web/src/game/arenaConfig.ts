@@ -11,17 +11,19 @@ const createNotePool = (start: number, end: number): number[] =>
 const TREBLE_NOTE_POOL = createNotePool(60, 83); // C4..B5
 const BASS_TRAINING_NOTE_POOL = createNotePool(36, 60); // C2..C4
 
-const SPEED_SCALE_REFERENCE_WIDTH = 1200;
-const MIN_VIEWPORT_SPEED_SCALE = 0.72;
-const COMPACT_VIEWPORT_MAX_WIDTH = 960;
-const COMPACT_VIEWPORT_SPEED_SCALE = 0.82;
+const CORE_RADIUS = 58;
+const SPAWN_RADIUS_SCALE = 0.46;
+const SPEED_REFERENCE_WIDTH = 1728;
+const SPEED_REFERENCE_HEIGHT = 1080;
+const SPEED_REFERENCE_TRAVEL_DISTANCE = Math.max(
+  1,
+  Math.min(SPEED_REFERENCE_WIDTH, SPEED_REFERENCE_HEIGHT) * SPAWN_RADIUS_SCALE - CORE_RADIUS,
+);
 
-const resolveViewportSpeedScale = (width: number): number => {
-  if (width >= SPEED_SCALE_REFERENCE_WIDTH) {
-    return 1;
-  }
-
-  return Math.max(MIN_VIEWPORT_SPEED_SCALE, width / SPEED_SCALE_REFERENCE_WIDTH);
+const resolveViewportSpeedScale = (spawnRadius: number): number => {
+  const travelDistanceToCore = Math.max(1, spawnRadius - CORE_RADIUS);
+  // Keep invader time-to-core consistent across arena sizes.
+  return travelDistanceToCore / SPEED_REFERENCE_TRAVEL_DISTANCE;
 };
 
 const PITCH_PACING_BY_LEVEL: Record<
@@ -63,6 +65,12 @@ const PITCH_MAX_CONCURRENT_BY_LEVEL: Record<DifficultyLevel, number> = {
   3: 3,
 };
 
+const ARCADE_MAX_WAVES_BY_LEVEL: Record<DifficultyLevel, number> = {
+  1: 8,
+  2: 10,
+  3: 12,
+};
+
 export const createArenaConfig = (
   width = 720,
   height = 540,
@@ -75,7 +83,7 @@ export const createArenaConfig = (
   });
   const centerX = width / 2;
   const centerY = height / 2;
-  const spawnRadius = Math.min(width, height) * 0.46;
+  const spawnRadius = Math.min(width, height) * SPAWN_RADIUS_SCALE;
 
   const levelPresets: Record<
     DifficultyLevel,
@@ -85,8 +93,8 @@ export const createArenaConfig = (
     > & { notePool: number[] }
   > = {
     1: {
-      baseSpawnIntervalMs: 2100,
-      spawnIntervalDecay: 0.985,
+      baseSpawnIntervalMs: 3000,
+      spawnIntervalDecay: 0.994,
       baseInvaderSpeed: 20,
       invaderSpeedGrowth: 1.03,
       baseMaxInvaders: 1,
@@ -113,6 +121,7 @@ export const createArenaConfig = (
   const preset = levelPresets[normalizedSettings.difficulty];
   const pitchPacing = PITCH_PACING_BY_LEVEL[normalizedSettings.difficulty];
 
+  const isArcadeMode = normalizedSettings.mode === 'arcade';
   const isPitchMode = normalizedSettings.mode === 'pitch';
   const isPracticeMode = normalizedSettings.mode === 'practice';
   const speedMultiplier = isPracticeMode
@@ -121,19 +130,16 @@ export const createArenaConfig = (
   const pitchSpeedScale = isPitchMode ? pitchPacing.speedScale : 1;
   const pitchSpawnIntervalScale = isPitchMode ? pitchPacing.spawnIntervalScale : 1;
   const pitchGrowthScale = isPitchMode ? pitchPacing.growthScale : 1;
-  // Compact viewports need more reaction time because travel distance is visually compressed.
-  const viewportSpeedScale = resolveViewportSpeedScale(width);
-  const compactViewportScale = width <= COMPACT_VIEWPORT_MAX_WIDTH
-    ? COMPACT_VIEWPORT_SPEED_SCALE
-    : 1;
+  const viewportSpeedScale = resolveViewportSpeedScale(spawnRadius);
   const baseInvaderSpeed =
     preset.baseInvaderSpeed
     * speedMultiplier
     * pitchSpeedScale
-    * viewportSpeedScale
-    * compactViewportScale;
+    * viewportSpeedScale;
   const baseSpawnIntervalMs = Math.round((preset.baseSpawnIntervalMs / speedMultiplier) * pitchSpawnIntervalScale);
-  const invaderSpeedGrowth = 1 + (preset.invaderSpeedGrowth - 1) * speedMultiplier * pitchGrowthScale;
+  const invaderSpeedGrowth = isArcadeMode
+    ? 1
+    : 1 + (preset.invaderSpeedGrowth - 1) * speedMultiplier * pitchGrowthScale;
   const spawnIntervalDecay = 1 - (1 - preset.spawnIntervalDecay) * speedMultiplier * pitchGrowthScale;
   const clefMode = isPracticeMode
     ? normalizedSettings.clefMode
@@ -155,7 +161,7 @@ export const createArenaConfig = (
     height,
     centerX,
     centerY,
-    coreRadius: 58,
+    coreRadius: CORE_RADIUS,
     spawnRadius,
     notePool,
     startingLives,
@@ -176,5 +182,6 @@ export const createArenaConfig = (
     sequenceWindowMs: 1500,
     maxConcurrentInvaders,
     patternLength,
+    maxArcadeWaves: isArcadeMode ? ARCADE_MAX_WAVES_BY_LEVEL[normalizedSettings.difficulty] : null,
   };
 };

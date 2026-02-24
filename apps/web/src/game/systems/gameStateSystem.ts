@@ -34,6 +34,7 @@ export class GameStateSystem {
   private nextSpawnAt = 0;
   private invaderSequence = 0;
   private laserSequence = 0;
+  private arcadeSpawningComplete = false;
   private readonly pitchMatcher: PitchMatcher;
 
   constructor(
@@ -56,6 +57,7 @@ export class GameStateSystem {
     this.state = createInitialState(this.config);
     this.invaderSequence = 0;
     this.laserSequence = 0;
+    this.arcadeSpawningComplete = false;
     this.pitchMatcher.resetAll([]);
 
     if (seedInitialWave) {
@@ -153,9 +155,13 @@ export class GameStateSystem {
     let waveAdvanced = false;
     const hitsRequired = computeMaxInvaders(this.config, this.state.wave);
     if (this.state.hitsThisWave >= hitsRequired) {
-      this.state.wave += 1;
-      this.state.hitsThisWave = 0;
-      waveAdvanced = true;
+      if (this.hasCompletedArcadeWaveLimit()) {
+        this.arcadeSpawningComplete = true;
+      } else {
+        this.state.wave += 1;
+        this.state.hitsThisWave = 0;
+        waveAdvanced = true;
+      }
     }
 
     const laser = createLaserShot({
@@ -250,6 +256,14 @@ export class GameStateSystem {
     }
   }
 
+  private hasCompletedArcadeWaveLimit(): boolean {
+    if (this.config.mode !== 'arcade' || this.config.maxArcadeWaves === null) {
+      return false;
+    }
+
+    return this.state.wave >= this.config.maxArcadeWaves;
+  }
+
   step(now: number, deltaMs: number): ArenaStepResult {
     if (this.state.gameOver) {
       return {
@@ -301,10 +315,24 @@ export class GameStateSystem {
       (laserId) => !this.state.lasers.some((laser) => laser.id === laserId),
     );
 
+    if (this.arcadeSpawningComplete && this.state.invaders.length === 0) {
+      this.state.gameOver = true;
+      return {
+        spawned: [],
+        reachedCore,
+        expiredLaserIds,
+        gameOver: true,
+      };
+    }
+
     const spawned: InvaderEntity[] = [];
     const maxInvaders = computeMaxInvaders(this.config, this.state.wave);
 
-    while (now >= this.nextSpawnAt && this.state.invaders.length < maxInvaders) {
+    while (
+      !this.arcadeSpawningComplete
+      && now >= this.nextSpawnAt
+      && this.state.invaders.length < maxInvaders
+    ) {
       const invader = this.spawnOne(now);
       this.state.invaders.push(invader);
       spawned.push(invader);

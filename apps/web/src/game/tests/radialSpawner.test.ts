@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createArenaConfig } from '@/game/arenaConfig';
 import {
   buildRadialInvader,
+  computeInvaderSpeed,
   computeMaxInvaders,
   computeSpawnIntervalMs,
   distanceToCore,
@@ -53,8 +54,21 @@ describe('radial spawner', () => {
     const wave1 = computeSpawnIntervalMs(config, 1);
     const wave20 = computeSpawnIntervalMs(config, 20);
 
-    expect(wave1).toBe(2100);
+    expect(wave1).toBe(3000);
     expect(wave20).toBeGreaterThanOrEqual(350);
+  });
+
+  it('keeps arcade invader speed constant across waves', () => {
+    const arcadeConfig = createArenaConfig();
+    const practiceConfig = createArenaConfig(720, 540, 1, {
+      mode: 'practice',
+      speedMultiplier: 1,
+      clefMode: 'treble',
+      livesMode: 'default',
+    });
+
+    expect(computeInvaderSpeed(arcadeConfig, 1)).toBeCloseTo(computeInvaderSpeed(arcadeConfig, 8), 6);
+    expect(computeInvaderSpeed(practiceConfig, 8)).toBeGreaterThan(computeInvaderSpeed(practiceConfig, 1));
   });
 
   it('caps pitch mode concurrent invaders to the configured maximum', () => {
