@@ -2,6 +2,7 @@ export type DifficultyLevel = 1 | 2 | 3;
 export type GameMode = 'arcade' | 'practice' | 'pitch';
 export type ClefMode = 'treble' | 'bass' | 'any';
 export type LivesMode = 'default' | 'infinite';
+export type InvaderTargetType = 'single' | 'chord' | 'pattern';
 
 export interface GameplaySettings {
   difficulty: DifficultyLevel;
@@ -86,12 +87,18 @@ export interface ArenaConfig {
   notePool: number[];
   startingLives: number;
   basePoints: number;
+  chordPoints: number;
   baseSpawnIntervalMs: number;
   spawnIntervalDecay: number;
   minSpawnIntervalMs: number;
   baseInvaderSpeed: number;
   invaderSpeedGrowth: number;
   baseMaxInvaders: number;
+  chordSimultaneousWindowMs: number;
+  chordArpeggioWindowMs: number;
+  arcadeWaveRules: ArcadeWaveRule[];
+  arcadeLoopSpawnIntervalScale: number;
+  arcadeLoopMaxInvaderIncrease: number;
   laserLifetimeMs: number;
   mode: GameMode;
   clefMode: ClefMode;
@@ -102,13 +109,30 @@ export interface ArenaConfig {
   sequenceWindowMs: number;
   maxConcurrentInvaders: number;
   patternLength: number;
-  maxArcadeWaves: number | null;
+}
+
+export interface ArcadeWaveRule {
+  label: string;
+  clefMode: ClefMode;
+  singleNotePool: number[];
+  chordRootPool: number[];
+  allowedTargets: Array<Extract<InvaderTargetType, 'single' | 'chord'>>;
+  chordChance: number;
+  baseSpawnIntervalMs: number;
+  minSpawnIntervalMs: number;
+  baseInvaderSpeed: number;
+  baseMaxInvaders: number;
+  speedRampWithinWave: number;
 }
 
 export interface InvaderEntity {
   id: string;
   note: number;
   pattern: number[];
+  requiredNotes: number[];
+  targetType: InvaderTargetType;
+  points: number;
+  clef: 'treble' | 'bass';
   x: number;
   y: number;
   vx: number;
@@ -133,7 +157,6 @@ export interface ArenaState {
   wave: number;
   lives: number;
   gameOver: boolean;
-  hitsThisWave: number;
   invaders: InvaderEntity[];
   lasers: LaserShot[];
 }

@@ -11,10 +11,18 @@ const makeInvader = (
   vx = 0,
   vy = 0,
   pattern: number[] = [note],
+  targetType: InvaderEntity['targetType'] = 'single',
+  requiredNotes: number[] = [note],
+  points = 100,
+  clef: InvaderEntity['clef'] = 'treble',
 ): InvaderEntity => ({
   id,
   note,
   pattern,
+  requiredNotes,
+  targetType,
+  points,
+  clef,
   x,
   y,
   vx,
@@ -169,31 +177,133 @@ describe('game state system', () => {
     expect(afterFreezeRelease.spawned).toHaveLength(1);
   });
 
-  it('ends arcade mode after the configured final wave is completed and cleared', () => {
-    const config = {
-      ...createArenaConfig(720, 540, 1, {
-        mode: 'arcade',
-      }),
-      maxArcadeWaves: 2,
-    };
+  it('continues arcade mode past wave 6 without auto-ending', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
     const system = new GameStateSystem(config, () => 0.3);
     system.resetForTests(0);
 
-    system.addInvaderForTest(makeInvader('w1', 60, config.centerX + 120, config.centerY));
-    system.processNote(60, 100);
+    system.getState().wave = 6;
+    system.getState().score = 5900;
+    system.addInvaderForTest(makeInvader('w6-final', 60, config.centerX + 120, config.centerY));
+
+    const hit = system.processNote(60, 100);
+    const step = system.step(200, 16);
+
+    expect(hit.kind).toBe('hit');
+    expect(system.getState().wave).toBe(7);
+    expect(step.gameOver).toBe(false);
+    expect(system.getState().gameOver).toBe(false);
+  });
+
+  it('advances waves at each 1000-point score block', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.getState().score = 900;
+    system.addInvaderForTest(makeInvader('target', 60, config.centerX + 120, config.centerY));
+    const toWave2 = system.processNote(60, 100);
+
+    expect(toWave2.kind).toBe('hit');
+    expect(toWave2.waveAdvanced).toBe(true);
     expect(system.getState().wave).toBe(2);
 
-    system.addInvaderForTest(makeInvader('w2a', 61, config.centerX + 120, config.centerY));
-    system.addInvaderForTest(makeInvader('w2b', 62, config.centerX + 140, config.centerY));
-    system.processNote(61, 200);
-    const finalHit = system.processNote(62, 300);
-    const step = system.step(5000, 16);
+    system.getState().score = 1900;
+    system.addInvaderForTest(makeInvader('target-2', 62, config.centerX + 120, config.centerY));
+    const toWave3 = system.processNote(62, 200);
 
-    expect(finalHit.kind).toBe('hit');
-    expect(step.spawned).toHaveLength(0);
-    expect(step.gameOver).toBe(true);
-    expect(system.getState().gameOver).toBe(true);
-    expect(system.getState().lives).toBe(config.startingLives);
+    expect(toWave3.kind).toBe('hit');
+    expect(toWave3.waveAdvanced).toBe(true);
+    expect(system.getState().wave).toBe(3);
+  });
+
+  it('does not roll back wave when score drops below a threshold after penalties', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.getState().wave = 2;
+    system.getState().score = 1000;
+
+    system.processNote(61, 100);
+    system.processNote(61, 200);
+
+    expect(system.getState().score).toBe(900);
+    expect(system.getState().wave).toBe(2);
+  });
+
+  it('scores 200 points for chord invaders and treats partial input as progress', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0.2);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(
+      makeInvader(
+        'chord',
+        60,
+        config.centerX + 140,
+        config.centerY,
+        0,
+        0,
+        [60],
+        'chord',
+        [60, 64, 67],
+        200,
+      ),
+    );
+
+    const first = system.processNote(60, 100);
+    const second = system.processNote(64, 150);
+    const hit = system.processNote(67, 190);
+
+    expect(first.kind).toBe('progress');
+    expect(first.scoreDelta).toBe(0);
+    expect(second.kind).toBe('progress');
+    expect(hit.kind).toBe('hit');
+    expect(hit.scoreDelta).toBe(200);
+    expect(system.getState().score).toBe(200);
+  });
+
+  it('never spawns duplicate single-note invaders in arcade waves', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0);
+    system.resetForTests(0);
+
+    system.getState().wave = 2;
+    system.addInvaderForTest(makeInvader('single-48', 48, config.centerX + 140, config.centerY));
+
+    const step = system.step(5000, 16);
+    const spawnedSingle = step.spawned.find((invader) => invader.targetType === 'single');
+
+    expect(spawnedSingle).toBeTruthy();
+    expect(spawnedSingle?.note).not.toBe(48);
+  });
+
+  it('prevents chord roots from overlapping active single-note invaders', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0);
+    system.resetForTests(0);
+
+    system.getState().wave = 5;
+    system.addInvaderForTest(makeInvader('single-48', 48, config.centerX + 140, config.centerY));
+
+    const step = system.step(5000, 16);
+    const spawnedChord = step.spawned.find((invader) => invader.targetType === 'chord');
+
+    expect(spawnedChord).toBeTruthy();
+    expect(spawnedChord?.requiredNotes[0]).not.toBe(48);
   });
 
   it('disables life-up meter progress and pulse power-up for infinite-lives practice mode', () => {

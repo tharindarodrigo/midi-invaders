@@ -1,17 +1,63 @@
 import type { ArenaConfig, InvaderEntity } from '@/types/gameplay';
+import {
+  getArcadeWaveLoop,
+  getArcadeWaveRuleForWave,
+} from '@/game/arenaConfig';
 
-export const computeInvaderSpeed = (config: ArenaConfig, wave: number): number => {
+interface WaveProgressArgs {
+  hitsThisWave?: number;
+  hitsRequired?: number;
+}
+
+const resolveWaveProgress = ({ hitsThisWave = 0, hitsRequired = 0 }: WaveProgressArgs): number => {
+  if (hitsRequired <= 0) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, hitsThisWave / hitsRequired));
+};
+
+export const computeInvaderSpeed = (
+  config: ArenaConfig,
+  wave: number,
+  progress: WaveProgressArgs = {},
+): number => {
+  if (config.mode === 'arcade') {
+    const waveRule = getArcadeWaveRuleForWave(config, wave);
+    if (waveRule) {
+      const waveProgress = resolveWaveProgress(progress);
+      return waveRule.baseInvaderSpeed * (1 + waveRule.speedRampWithinWave * waveProgress);
+    }
+  }
+
   return config.baseInvaderSpeed * config.invaderSpeedGrowth ** (wave - 1);
 };
 
 export const computeSpawnIntervalMs = (config: ArenaConfig, wave: number): number => {
+  if (config.mode === 'arcade') {
+    const waveRule = getArcadeWaveRuleForWave(config, wave);
+    if (waveRule) {
+      const loop = getArcadeWaveLoop(wave, config.arcadeWaveRules.length);
+      const interval = waveRule.baseSpawnIntervalMs * config.arcadeLoopSpawnIntervalScale ** loop;
+      return Math.max(waveRule.minSpawnIntervalMs, Math.round(interval));
+    }
+  }
+
   const interval = config.baseSpawnIntervalMs * config.spawnIntervalDecay ** (wave - 1);
-  return Math.max(config.minSpawnIntervalMs, interval);
+  return Math.max(config.minSpawnIntervalMs, Math.round(interval));
 };
 
 export const computeMaxInvaders = (config: ArenaConfig, wave: number): number => {
   if (config.mode === 'pitch') {
     return config.maxConcurrentInvaders;
+  }
+
+  if (config.mode === 'arcade') {
+    const waveRule = getArcadeWaveRuleForWave(config, wave);
+    if (waveRule) {
+      const loop = getArcadeWaveLoop(wave, config.arcadeWaveRules.length);
+      return waveRule.baseMaxInvaders + loop * config.arcadeLoopMaxInvaderIncrease;
+    }
   }
 
   return config.baseMaxInvaders + (wave - 1);
@@ -48,6 +94,8 @@ interface BuildInvaderArgs {
   note: number;
   wave: number;
   now: number;
+  hitsThisWave?: number;
+  hitsRequired?: number;
   random: () => number;
 }
 
@@ -57,10 +105,15 @@ export const buildRadialInvader = ({
   note,
   wave,
   now,
+  hitsThisWave = 0,
+  hitsRequired = 0,
   random,
 }: BuildInvaderArgs): InvaderEntity => {
   const { x, y } = pickBorderSpawnPoint(config.width, config.height, random);
-  const speed = computeInvaderSpeed(config, wave);
+  const speed = computeInvaderSpeed(config, wave, {
+    hitsThisWave,
+    hitsRequired,
+  });
 
   const dx = config.centerX - x;
   const dy = config.centerY - y;
@@ -70,6 +123,10 @@ export const buildRadialInvader = ({
     id,
     note,
     pattern: [note],
+    requiredNotes: [note],
+    targetType: 'single',
+    points: config.basePoints,
+    clef: 'treble',
     x,
     y,
     vx: (dx / length) * speed,

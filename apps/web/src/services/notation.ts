@@ -56,6 +56,14 @@ export const renderStaffNoteToCanvas = (
   midiNote: number,
   options: { clef?: 'treble' | 'bass'; palette?: Partial<StaffRenderPalette>; insetX?: number } = {},
 ): void => {
+  renderStaffNotesToCanvas(canvas, [midiNote], options);
+};
+
+export const renderStaffNotesToCanvas = (
+  canvas: HTMLCanvasElement,
+  midiNotes: number[],
+  options: { clef?: 'treble' | 'bass'; palette?: Partial<StaffRenderPalette>; insetX?: number } = {},
+): void => {
   const palette = {
     ...DEFAULT_STAFF_RENDER_PALETTE,
     ...(options.palette ?? {}),
@@ -84,10 +92,15 @@ export const renderStaffNoteToCanvas = (
   });
   stave.draw();
 
-  const vexKey = midiToVexKey(midiNote);
-  const stemDirection = getStemDirectionForMidi(midiNote, clef);
+  const safeMidiNotes = midiNotes.length > 0 ? [...midiNotes] : [60];
+  const sortedMidiNotes = [...new Set(safeMidiNotes)].sort((left, right) => left - right);
+  const vexKeys = sortedMidiNotes.map((midiNote) => midiToVexKey(midiNote));
+  const stemDirection = getStemDirectionForMidi(
+    sortedMidiNotes[sortedMidiNotes.length - 1] ?? 60,
+    clef,
+  );
   const note = new StaveNote({
-    keys: [vexKey],
+    keys: vexKeys,
     duration: 'q',
     clef,
     autoStem: false,
@@ -104,13 +117,18 @@ export const renderStaffNoteToCanvas = (
     lineWidth: 2,
   });
 
-  if (vexKey.includes('#')) {
+  for (let index = 0; index < vexKeys.length; index += 1) {
+    const vexKey = vexKeys[index];
+    if (!vexKey || !vexKey.includes('#')) {
+      continue;
+    }
+
     const accidental = new Accidental('#');
     accidental.setStyle({
       fillStyle: accidentalColor,
       strokeStyle: accidentalColor,
     });
-    note.addModifier(accidental, 0);
+    note.addModifier(accidental, index);
   }
 
   Formatter.FormatAndDraw(context, stave, [note]);

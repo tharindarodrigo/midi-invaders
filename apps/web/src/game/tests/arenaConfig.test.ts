@@ -6,43 +6,24 @@ const timeToReachCoreSeconds = (
 ): number => (config.spawnRadius - config.coreRadius) / config.baseInvaderSpeed;
 
 describe('arena config difficulty presets', () => {
-  it('sets level 1 to very slow and starts with one invader', () => {
-    const level1 = createArenaConfig(1728, 1080, 1);
+  it('builds a fixed 6-wave arcade plan and ignores difficulty selection', () => {
+    const arcadeLevel1 = createArenaConfig(1728, 1080, 1, { mode: 'arcade' });
+    const arcadeLevel3 = createArenaConfig(1728, 1080, 3, { mode: 'arcade' });
 
-    expect(level1.baseInvaderSpeed).toBe(20);
-    expect(level1.baseMaxInvaders).toBe(1);
-    expect(level1.baseSpawnIntervalMs).toBe(3000);
-    expect(level1.invaderSpeedGrowth).toBe(1);
-    expect(level1.maxArcadeWaves).toBe(8);
-  });
-
-  it('scales up challenge across levels', () => {
-    const level1 = createArenaConfig(1728, 1080, 1);
-    const level3 = createArenaConfig(1728, 1080, 3);
-
-    expect(level3.baseInvaderSpeed).toBeGreaterThan(level1.baseInvaderSpeed);
-    expect(level3.baseMaxInvaders).toBeGreaterThan(level1.baseMaxInvaders);
-    expect(level3.baseSpawnIntervalMs).toBeLessThan(level1.baseSpawnIntervalMs);
-  });
-
-  it('uses a C2..C4 note pool for level 2 bass-clef training', () => {
-    const level2 = createArenaConfig(1200, 800, 2);
-
-    expect(level2.notePool[0]).toBe(36);
-    expect(level2.notePool[level2.notePool.length - 1]).toBe(60);
-    expect(level2.notePool).toContain(48);
-    expect(level2.notePool).toContain(60);
-  });
-
-  it('keeps level 2 pacing slower with fewer simultaneous invaders', () => {
-    const level2 = createArenaConfig(1728, 1080, 2);
-
-    expect(level2.baseInvaderSpeed).toBe(24);
-    expect(level2.baseMaxInvaders).toBe(3);
-    expect(level2.baseSpawnIntervalMs).toBe(1800);
-    expect(level2.spawnIntervalDecay).toBe(0.978);
-    expect(level2.invaderSpeedGrowth).toBe(1);
-    expect(level2.maxArcadeWaves).toBe(10);
+    expect(arcadeLevel1.arcadeWaveRules).toHaveLength(6);
+    expect(arcadeLevel1.arcadeWaveRules[0]?.label).toContain('Wave 1');
+    expect(arcadeLevel1.arcadeWaveRules[2]?.allowedTargets).toEqual(['chord']);
+    expect(arcadeLevel1.arcadeWaveRules[4]?.allowedTargets).toEqual(['single', 'chord']);
+    expect(arcadeLevel1.baseInvaderSpeed).toBe(20);
+    expect(arcadeLevel1.baseMaxInvaders).toBe(1);
+    expect(arcadeLevel1.baseSpawnIntervalMs).toBe(2800);
+    expect(arcadeLevel1.invaderSpeedGrowth).toBe(1);
+    expect(arcadeLevel1.baseInvaderSpeed).toBe(arcadeLevel3.baseInvaderSpeed);
+    expect(arcadeLevel1.baseSpawnIntervalMs).toBe(arcadeLevel3.baseSpawnIntervalMs);
+    expect(arcadeLevel1.baseMaxInvaders).toBe(arcadeLevel3.baseMaxInvaders);
+    expect(arcadeLevel1.chordPoints).toBe(200);
+    expect(arcadeLevel1.chordSimultaneousWindowMs).toBe(120);
+    expect(arcadeLevel1.chordArpeggioWindowMs).toBe(900);
   });
 
   it('scales invader speed down on compact viewports', () => {
@@ -85,7 +66,7 @@ describe('arena config difficulty presets', () => {
     expect(practice.infiniteLives).toBe(true);
     expect(practice.lifeUpsEnabled).toBe(false);
     expect(practice.startingLives).toBe(Number.POSITIVE_INFINITY);
-    expect(practice.maxArcadeWaves).toBeNull();
+    expect(practice.arcadeWaveRules).toHaveLength(0);
   });
 
   it('builds pitch mode config with level-based pattern length, cap, and miss penalty', () => {
@@ -107,7 +88,7 @@ describe('arena config difficulty presets', () => {
     expect(level2.baseSpawnIntervalMs).toBeGreaterThan(arcadeLevel2.baseSpawnIntervalMs);
     expect(level2.promptRepeatMs).toBeGreaterThan(2200);
     expect(level2.invaderSpeedGrowth).toBeGreaterThan(1);
-    expect(level2.maxArcadeWaves).toBeNull();
+    expect(level2.arcadeWaveRules).toHaveLength(0);
   });
 
   it('keeps non-pitch mode penalty unchanged', () => {

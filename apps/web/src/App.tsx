@@ -142,7 +142,10 @@ export default function App() {
   const gameplaySettings = useMemo<GameplaySettings>(
     () =>
       normalizeGameplaySettings({
-        difficulty: selectedDifficulty,
+        difficulty:
+          selectedGameMode === 'arcade'
+            ? DEFAULT_GAMEPLAY_SETTINGS.difficulty
+            : selectedDifficulty,
         mode: selectedGameMode,
         clefMode: selectedClefMode,
         speedMultiplier: selectedSpeedMultiplier,
@@ -927,9 +930,9 @@ export default function App() {
                 <p>Pitch mode is non-visual: invaders play repeating melodies. No note notation is shown.</p>
               ) : selectedGameMode === 'practice' ? (
                 <p>Practice mode uses your custom clef, speed, and lives tuner from the left panel.</p>
-              ) : selectedDifficulty === 2 ? (
-                <p>Level 2 uses C2-C4 targets with an A3-C4 bass/treble overlap and up to two ledger lines per clef.</p>
-              ) : null}
+              ) : (
+                <p>Arcade runs a 6-wave loop: treble singles, mixed-clef singles, then major chord waves.</p>
+              )}
               {selectedInputMode === 'keyboard' ? (
                 <>
                   <svg className="keyboard-svg" viewBox="0 0 420 118" role="img" aria-label="Keyboard guide">

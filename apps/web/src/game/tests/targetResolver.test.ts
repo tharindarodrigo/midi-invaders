@@ -2,10 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { resolveNearestThreatTarget } from '@/game/systems/targetResolver';
 import type { InvaderEntity } from '@/types/gameplay';
 
-const makeInvader = (id: string, note: number, x: number, y: number): InvaderEntity => ({
+const makeInvader = (
+  id: string,
+  note: number,
+  x: number,
+  y: number,
+  targetType: InvaderEntity['targetType'] = 'single',
+): InvaderEntity => ({
   id,
   note,
   pattern: [note],
+  requiredNotes: [note],
+  targetType,
+  points: 100,
+  clef: 'treble',
   x,
   y,
   vx: 0,
@@ -36,6 +46,20 @@ describe('target resolver', () => {
   it('returns no target when no note match exists', () => {
     const resolution = resolveNearestThreatTarget({
       invaders: [makeInvader('z', 67, 420, 280)],
+      note: 60,
+      centerX: 360,
+      centerY: 270,
+    });
+
+    expect(resolution.matched).toBe(false);
+    expect(resolution.target).toBeNull();
+  });
+
+  it('ignores chord invaders for single-note matching', () => {
+    const resolution = resolveNearestThreatTarget({
+      invaders: [
+        makeInvader('chord', 60, 370, 270, 'chord'),
+      ],
       note: 60,
       centerX: 360,
       centerY: 270,

@@ -5,7 +5,11 @@ import { resolveInvaderClef, type StaffClef } from '@/game/notationProfile';
 import { GameStateSystem } from '@/game/systems/gameStateSystem';
 import { PromptScheduler } from '@/game/systems/promptScheduler';
 import { InvaderPromptSynth } from '@/services/invaderPromptSynth';
-import { renderStaffNoteToCanvas, type StaffRenderPalette } from '@/services/notation';
+import {
+  renderStaffNoteToCanvas,
+  renderStaffNotesToCanvas,
+  type StaffRenderPalette,
+} from '@/services/notation';
 import {
   DEFAULT_GAMEPLAY_SETTINGS,
   normalizeGameplaySettings,
@@ -404,7 +408,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private renderInvader(invader: InvaderEntity): void {
-    const { id, note, x, y } = invader;
+    const { id, x, y } = invader;
 
     const halo = this.add.circle(0, 0, INVADER_HALO_RADIUS, 0x22d3ee, 0.12);
     const shell = this.add.circle(0, 0, INVADER_BODY_RADIUS, 0x020617, 0.88);
@@ -420,8 +424,7 @@ export class GameScene extends Phaser.Scene {
       centerDot.setStrokeStyle(1, 0xc4b5fd, 0.65);
       children.push(centerDot);
     } else {
-      const clef = resolveInvaderClef(this.arenaConfig.clefMode, note, id);
-      const notationTextureKey = this.ensureNotationTexture(note, clef);
+      const notationTextureKey = this.ensureNotationTexture(invader.requiredNotes, invader.clef);
       const notationSprite = this.add.image(
         0,
         NOTATION_VERTICAL_OFFSET,
@@ -438,8 +441,9 @@ export class GameScene extends Phaser.Scene {
     this.invaderViews.set(id, { container, shell });
   }
 
-  private ensureNotationTexture(note: number, clef: StaffClef): string {
-    const textureKey = `staff-note-${NOTATION_TEXTURE_VERSION}-${clef}-${note}`;
+  private ensureNotationTexture(notes: number[], clef: StaffClef): string {
+    const safeNotes = notes.length > 0 ? notes : [60];
+    const textureKey = `staff-note-${NOTATION_TEXTURE_VERSION}-${clef}-${safeNotes.join('-')}`;
     if (this.textures.exists(textureKey)) {
       return textureKey;
     }
@@ -454,7 +458,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const canvas = canvasTexture.getCanvas();
-    renderStaffNoteToCanvas(canvas, note, { clef, insetX: INVADER_STAFF_INSET_X });
+    renderStaffNotesToCanvas(canvas, safeNotes, { clef, insetX: INVADER_STAFF_INSET_X });
     canvasTexture.refresh();
 
     return textureKey;

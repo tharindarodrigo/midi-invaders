@@ -11,6 +11,10 @@ const makeInvader = (
   id,
   note: pattern[0] ?? 60,
   pattern,
+  requiredNotes: [pattern[0] ?? 60],
+  targetType: 'pattern',
+  points: 100,
+  clef: 'treble',
   x,
   y,
   vx: 0,
@@ -117,4 +121,3 @@ describe('pitch matcher', () => {
     expect(afterTimeout.kind).toBe('miss');
   });
 });
-

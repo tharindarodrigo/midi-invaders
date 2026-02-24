@@ -191,22 +191,25 @@ export function HudOverlay({
         <option value="pitch">Pitch Recognition</option>
       </select>
 
-      <label className="input-label" htmlFor="difficulty-level">
-        Difficulty
-      </label>
-      <select
-        id="difficulty-level"
-        className="device-select"
-        value={selectedDifficulty}
-        onChange={(event) => onSelectDifficulty(Number(event.target.value) as DifficultyLevel)}
-      >
-        <option value={1}>Level 1 (Very Slow)</option>
-        <option value={2}>Level 2 (Bass + Treble Overlap)</option>
-        <option value={3}>Level 3</option>
-      </select>
-      {selectedGameMode === 'arcade' && selectedDifficulty === 2 ? (
-        <p className="status">Level 2 targets span C2-C4. A3-C4 overlap may show in either clef.</p>
-      ) : null}
+      {selectedGameMode === 'arcade' ? (
+        <p className="status">Arcade uses fixed waves: Treble, mixed clefs, then major-chord waves.</p>
+      ) : (
+        <>
+          <label className="input-label" htmlFor="difficulty-level">
+            Difficulty
+          </label>
+          <select
+            id="difficulty-level"
+            className="device-select"
+            value={selectedDifficulty}
+            onChange={(event) => onSelectDifficulty(Number(event.target.value) as DifficultyLevel)}
+          >
+            <option value={1}>Level 1 (Very Slow)</option>
+            <option value={2}>Level 2 (Bass + Treble Overlap)</option>
+            <option value={3}>Level 3</option>
+          </select>
+        </>
+      )}
       {selectedGameMode === 'pitch' ? (
         <p className="status">Listen to each invader melody and play it back in order.</p>
       ) : null}

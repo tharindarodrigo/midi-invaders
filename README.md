@@ -44,7 +44,7 @@
 - Successful hits now show a floating `+points` popup near the destroyed invader.
 - Difficulty level 1 now starts with one incoming invader, uses a slower spawn cadence, and ramps pressure more gently.
 - Difficulty level 2 now trains bass-clef reading with targets from `C2` to `C4`, including an `A3`-to-`C4` treble/bass overlap for ledger-line practice, while keeping notation within about two ledger lines per clef.
-- Gameplay options now support `Arcade` (preset difficulty), `Practice` (custom clef/speed/lives), and `Pitch Recognition` (ear-training, difficulty-only).
+- Gameplay options support `Arcade` (fixed wave curriculum), `Practice` (custom clef/speed/lives), and `Pitch Recognition` (ear-training, difficulty-only).
 - In `Practice` mode with `infinite` lives, the `1UP` meter and 1000-point pulse power-up are disabled.
 - Wrong notes now apply a `-50` score penalty in Arcade/Practice, show a floating penalty popup, and freeze gameplay for 1 second.
 - A large animated center staff now echoes your played note; wrong notes render red and stay visible until you play a correct note.
@@ -61,7 +61,9 @@
 - The pre-game overlay now includes a direct `Connect Microphone` action for mobile-friendly onboarding before pressing `Play`.
 - Mobile canvas sizing now uses larger gameplay presets and aspect-preserving rendering so invaders remain readable on phones.
 - Invader approach speed now scales by arena travel distance so time-to-center stays consistent across screen sizes.
-- Arcade mode now keeps invader travel speed constant within a run and ends after a finite wave cap per difficulty.
+- Arcade mode now runs a repeating 6-wave curriculum (treble singles, mixed-clef singles, treble chords, bass chords, mixed waves) with small in-wave speed ramps and per-wave speed resets; waves advance at each `1000` total-score block (`1000`, `2000`, `3000`, ...).
+- Chord invaders award `200` points and can be cleared with either block triads (near-simultaneous) or ascending arpeggios.
+- Active single-note invaders now avoid duplicate note targets on canvas, and chord roots are prevented from overlapping active single-note targets.
 - Game Over now includes an in-app feedback form with 1-5 stars plus optional written feedback.
 - Feedback copy clearly states submissions are personally reviewed by the team (no AI auto-review).
 - Feedback API uses session-bound tokens, one submission per session, honeypot checks, and endpoint rate limits to reduce bot spam.

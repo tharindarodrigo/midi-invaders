@@ -51,16 +51,17 @@ describe('radial spawner', () => {
     const config = createArenaConfig();
 
     expect(computeMaxInvaders(config, 1)).toBe(1);
-    expect(computeMaxInvaders(config, 4)).toBe(4);
+    expect(computeMaxInvaders(config, 4)).toBe(2);
+    expect(computeMaxInvaders(config, 7)).toBe(2);
 
     const wave1 = computeSpawnIntervalMs(config, 1);
     const wave20 = computeSpawnIntervalMs(config, 20);
 
-    expect(wave1).toBe(3000);
-    expect(wave20).toBeGreaterThanOrEqual(350);
+    expect(wave1).toBe(2800);
+    expect(wave20).toBeGreaterThanOrEqual(1300);
   });
 
-  it('keeps arcade invader speed constant across waves', () => {
+  it('ramps speed slightly within a wave and resets on the next wave', () => {
     const arcadeConfig = createArenaConfig();
     const practiceConfig = createArenaConfig(720, 540, 1, {
       mode: 'practice',
@@ -69,7 +70,21 @@ describe('radial spawner', () => {
       livesMode: 'default',
     });
 
-    expect(computeInvaderSpeed(arcadeConfig, 1)).toBeCloseTo(computeInvaderSpeed(arcadeConfig, 8), 6);
+    const wave3Start = computeInvaderSpeed(arcadeConfig, 3, {
+      hitsThisWave: 0,
+      hitsRequired: 2,
+    });
+    const wave3End = computeInvaderSpeed(arcadeConfig, 3, {
+      hitsThisWave: 2,
+      hitsRequired: 2,
+    });
+    const wave4Reset = computeInvaderSpeed(arcadeConfig, 4, {
+      hitsThisWave: 0,
+      hitsRequired: 2,
+    });
+
+    expect(wave3End).toBeGreaterThan(wave3Start);
+    expect(wave4Reset).toBeCloseTo(wave3Start, 6);
     expect(computeInvaderSpeed(practiceConfig, 8)).toBeGreaterThan(computeInvaderSpeed(practiceConfig, 1));
   });
 
