@@ -7,6 +7,24 @@ const STAVE_HEIGHT_PX = 40;
 // Optical centering inside the circular invader reads better with a slight upward shift.
 const STAVE_VISUAL_OFFSET_Y_PX = -34;
 
+export interface StaffRenderPalette {
+  staffColor: string;
+  noteColor: string;
+  accidentalColor: string;
+  gradientStart: string;
+  gradientMiddle: string;
+  gradientEnd: string;
+}
+
+const DEFAULT_STAFF_RENDER_PALETTE: StaffRenderPalette = {
+  staffColor: '#22d3ee',
+  noteColor: '#a3e635',
+  accidentalColor: '#f472b6',
+  gradientStart: '#22d3ee',
+  gradientMiddle: '#a3e635',
+  gradientEnd: '#f472b6',
+};
+
 export const getStemDirectionForMidi = (
   midiNote: number,
   clef: 'treble' | 'bass' = 'treble',
@@ -36,19 +54,21 @@ export const getCenteredStaveY = (canvasHeight: number): number => {
 export const renderStaffNoteToCanvas = (
   canvas: HTMLCanvasElement,
   midiNote: number,
-  options: { clef?: 'treble' | 'bass' } = {},
+  options: { clef?: 'treble' | 'bass'; palette?: Partial<StaffRenderPalette>; insetX?: number } = {},
 ): void => {
-  const staffColor = '#22d3ee';
-  const noteColor = '#a3e635';
-  const accidentalColor = '#f472b6';
+  const palette = {
+    ...DEFAULT_STAFF_RENDER_PALETTE,
+    ...(options.palette ?? {}),
+  };
+  const { staffColor, noteColor, accidentalColor } = palette;
 
   const clef = options.clef ?? 'treble';
   const width = canvas.width;
   const height = canvas.height;
   // Keep enough left room for accidentals and enough vertical room for ledger lines.
-  const insetX = 18;
+  const insetX = options.insetX ?? 18;
   const staveY = getCenteredStaveY(height);
-  const staveWidth = width - insetX * 2;
+  const staveWidth = Math.max(84, width - insetX * 2);
 
   const renderer = new Renderer(canvas, Renderer.Backends.CANVAS);
   const context = renderer.getContext();
@@ -101,9 +121,9 @@ export const renderStaffNoteToCanvas = (
     rawContext.save();
     rawContext.globalCompositeOperation = 'source-atop';
     const gradient = rawContext.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#22d3ee');
-    gradient.addColorStop(0.5, '#a3e635');
-    gradient.addColorStop(1, '#f472b6');
+    gradient.addColorStop(0, palette.gradientStart);
+    gradient.addColorStop(0.5, palette.gradientMiddle);
+    gradient.addColorStop(1, palette.gradientEnd);
     rawContext.fillStyle = gradient;
     rawContext.fillRect(0, 0, width, height);
     rawContext.restore();

@@ -452,6 +452,7 @@ export default function App() {
   const overlayModeLabel =
     hud.mode === 'practice' ? 'Practice' : hud.mode === 'pitch' ? 'Pitch Recognition' : 'Arcade';
   const overlayMissPenalty = hud.mode === 'pitch' ? 25 : 50;
+  const gameplayFocusedLayout = hud.scene === 'game';
 
   return (
     <main className="app-root">
@@ -501,87 +502,94 @@ export default function App() {
         </div>
       </section>
 
-      <section className="play-shell" aria-label="Play MIDI Invaders">
-        <HudOverlay
-          selectedInputMode={selectedInputMode}
-          midiSupported={midiSupported}
-          midiStatus={midiStatus}
-          midiError={midiError}
-          microphoneSupported={microphoneSupported}
-          microphoneStatus={microphoneStatus}
-          microphoneError={microphoneError}
-          midiDevices={midiDevices}
-          selectedInputId={selectedInputId}
-          selectedGameMode={selectedGameMode}
-          selectedDifficulty={selectedDifficulty}
-          selectedClefMode={selectedClefMode}
-          selectedSpeedMultiplier={selectedSpeedMultiplier}
-          selectedLivesMode={selectedLivesMode}
-          noteHistory={noteHistory}
-          analyticsEnabled={analyticsEnabled}
-          onSelectInputMode={handleSelectInputMode}
-          onConnectMidi={connectMidi}
-          onConnectMicrophone={connectMicrophone}
-          onSelectMidiInput={handleSelectMidiInput}
-          onSelectGameMode={setSelectedGameMode}
-          onSelectDifficulty={setSelectedDifficulty}
-          onSelectClefMode={setSelectedClefMode}
-          onSelectSpeedMultiplier={setSelectedSpeedMultiplier}
-          onSelectLivesMode={setSelectedLivesMode}
-          onToggleAnalytics={handleToggleAnalytics}
-          onFeedbackLinkClick={handleFeedbackFormOpen}
-          canStart={canStartGame}
-          onStart={startGame}
-          onEnd={endGame}
-          onRestart={restartGame}
-          feedbackFormUrl={FEEDBACK_FORM_URL}
-        />
+      <section className={`play-shell ${gameplayFocusedLayout ? 'gameplay-focus' : ''}`} aria-label="Play MIDI Invaders">
+        <div className={`hud-panel-shell ${gameplayFocusedLayout ? 'is-hidden' : ''}`}>
+          <HudOverlay
+            selectedInputMode={selectedInputMode}
+            midiSupported={midiSupported}
+            midiStatus={midiStatus}
+            midiError={midiError}
+            microphoneSupported={microphoneSupported}
+            microphoneStatus={microphoneStatus}
+            microphoneError={microphoneError}
+            midiDevices={midiDevices}
+            selectedInputId={selectedInputId}
+            selectedGameMode={selectedGameMode}
+            selectedDifficulty={selectedDifficulty}
+            selectedClefMode={selectedClefMode}
+            selectedSpeedMultiplier={selectedSpeedMultiplier}
+            selectedLivesMode={selectedLivesMode}
+            noteHistory={noteHistory}
+            analyticsEnabled={analyticsEnabled}
+            onSelectInputMode={handleSelectInputMode}
+            onConnectMidi={connectMidi}
+            onConnectMicrophone={connectMicrophone}
+            onSelectMidiInput={handleSelectMidiInput}
+            onSelectGameMode={setSelectedGameMode}
+            onSelectDifficulty={setSelectedDifficulty}
+            onSelectClefMode={setSelectedClefMode}
+            onSelectSpeedMultiplier={setSelectedSpeedMultiplier}
+            onSelectLivesMode={setSelectedLivesMode}
+            onToggleAnalytics={handleToggleAnalytics}
+            onFeedbackLinkClick={handleFeedbackFormOpen}
+            canStart={canStartGame}
+            onStart={startGame}
+            onEnd={endGame}
+            onRestart={restartGame}
+            feedbackFormUrl={FEEDBACK_FORM_URL}
+          />
+        </div>
         <section ref={canvasSectionRef} className="game-canvas-shell" aria-label="Game canvas shell">
           <section id={containerId} className="game-canvas" aria-label="Game canvas" />
           {hud.scene === 'game' ? (
-            <div className="game-stats-layer" aria-label="Gameplay stats">
-              <aside className="game-stats-panel left">
-                <p className="game-stat-row">
-                  <span className="game-stat-label">Mode</span>
-                  <span className="game-stat-value">{overlayModeLabel}</span>
-                </p>
-                <p className="game-stat-row">
-                  <span className="game-stat-label">Wave</span>
-                  <span className="game-stat-value">{hud.wave}</span>
-                </p>
-                <p className="game-stat-row">
-                  <span className="game-stat-label">Invaders</span>
-                  <span className="game-stat-value">{hud.activeInvaders}</span>
-                </p>
-              </aside>
-              <aside className="game-stats-panel right">
-                <p className="game-score-title">Score</p>
-                <p className="game-score-value">{hud.score.toLocaleString()}</p>
-                <p className="game-stat-row">
-                  <span className="game-stat-label">Lives</span>
-                  <span className="game-stat-value">{livesLabel}</span>
-                </p>
-                {hud.lifeUpsEnabled ? (
-                  <>
-                    <p className="game-stat-row">
-                      <span className="game-stat-label">1UP Meter</span>
-                      <span className="game-stat-value">{hud.lifeScore}/1000</span>
-                    </p>
-                    <p className="game-stat-note">
-                      Miss: -{overlayMissPenalty} score, -{overlayMissPenalty} 1UP, +1s freeze
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="game-stat-row">
-                      <span className="game-stat-label">1UP Meter</span>
-                      <span className="game-stat-value">Disabled</span>
-                    </p>
-                    <p className="game-stat-note">Miss: -{overlayMissPenalty} score, +1s freeze</p>
-                  </>
-                )}
-              </aside>
-            </div>
+            <>
+              <div className="game-stats-layer" aria-label="Gameplay stats">
+                <aside className="game-stats-panel left">
+                  <p className="game-stat-row">
+                    <span className="game-stat-label">Mode</span>
+                    <span className="game-stat-value">{overlayModeLabel}</span>
+                  </p>
+                  <p className="game-stat-row">
+                    <span className="game-stat-label">Wave</span>
+                    <span className="game-stat-value">{hud.wave}</span>
+                  </p>
+                  <p className="game-stat-row">
+                    <span className="game-stat-label">Invaders</span>
+                    <span className="game-stat-value">{hud.activeInvaders}</span>
+                  </p>
+                </aside>
+                <aside className="game-stats-panel right">
+                  <p className="game-score-title">Score</p>
+                  <p className="game-score-value">{hud.score.toLocaleString()}</p>
+                  <p className="game-stat-row">
+                    <span className="game-stat-label">Lives</span>
+                    <span className="game-stat-value">{livesLabel}</span>
+                  </p>
+                  {hud.lifeUpsEnabled ? (
+                    <>
+                      <p className="game-stat-row">
+                        <span className="game-stat-label">1UP Meter</span>
+                        <span className="game-stat-value">{hud.lifeScore}/1000</span>
+                      </p>
+                      <p className="game-stat-note">
+                        Miss: -{overlayMissPenalty} score, -{overlayMissPenalty} 1UP, +1s freeze
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="game-stat-row">
+                        <span className="game-stat-label">1UP Meter</span>
+                        <span className="game-stat-value">Disabled</span>
+                      </p>
+                      <p className="game-stat-note">Miss: -{overlayMissPenalty} score, +1s freeze</p>
+                    </>
+                  )}
+                </aside>
+              </div>
+              <button className="game-exit-button" onClick={endGame} type="button">
+                End Game
+              </button>
+            </>
           ) : null}
           {hud.scene === 'game-over' ? (
             <div className="game-instructions game-results" aria-label="Game results">

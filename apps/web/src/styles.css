@@ -176,6 +176,18 @@ body {
   gap: 18px;
 }
 
+.hud-panel-shell {
+  min-width: 0;
+}
+
+.play-shell.gameplay-focus {
+  grid-template-columns: 1fr;
+}
+
+.hud-panel-shell.is-hidden {
+  display: none;
+}
+
 .hud-panel {
   background: linear-gradient(180deg, rgb(16 6 37 / 95%) 0%, rgb(7 4 18 / 96%) 100%);
   border: 1px solid rgb(139 92 246 / 75%);
@@ -362,6 +374,28 @@ button:disabled {
   gap: 12px;
   pointer-events: none;
   z-index: 6;
+}
+
+.game-exit-button {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 8px 14px;
+  border: 1px solid rgb(248 113 113 / 75%);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgb(127 29 29 / 92%) 0%, rgb(185 28 28 / 92%) 100%);
+  color: #fee2e2;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 0 0 16px rgb(248 113 113 / 32%);
+}
+
+.game-exit-button:hover {
+  background: linear-gradient(135deg, rgb(153 27 27 / 96%) 0%, rgb(220 38 38 / 96%) 100%);
 }
 
 .game-stats-panel {

@@ -45,6 +45,7 @@
 - Gameplay options now support `Arcade` (preset difficulty), `Practice` (custom clef/speed/lives), and `Pitch Recognition` (ear-training, difficulty-only).
 - In `Practice` mode with `infinite` lives, the `1UP` meter and 1000-point pulse power-up are disabled.
 - Wrong notes now apply a `-50` score penalty in Arcade/Practice, show a floating penalty popup, and freeze gameplay for 1 second.
+- A large animated center staff now echoes your played note; wrong notes render red and stay visible until you play a correct note.
 - In `Computer Keyboard` mode, turning `CapsLock` on shifts mapped notes down by two octaves for bass-note practice.
 - A separate `1UP` meter grants `+1 life` every 1000 points of meter progress; penalties reduce this meter down to `0` minimum without removing earned lives.
 - On each life-up power-up, a green pulse erupts from center and clears up to the 5 nearest invaders.

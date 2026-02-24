@@ -5,7 +5,7 @@ import { resolveInvaderClef, type StaffClef } from '@/game/notationProfile';
 import { GameStateSystem } from '@/game/systems/gameStateSystem';
 import { PromptScheduler } from '@/game/systems/promptScheduler';
 import { InvaderPromptSynth } from '@/services/invaderPromptSynth';
-import { renderStaffNoteToCanvas } from '@/services/notation';
+import { renderStaffNoteToCanvas, type StaffRenderPalette } from '@/services/notation';
 import {
   DEFAULT_GAMEPLAY_SETTINGS,
   normalizeGameplaySettings,
@@ -24,17 +24,24 @@ interface LaserView {
   muzzleFlash: Phaser.GameObjects.Arc;
 }
 
+interface PlayedNoteDisplay {
+  container: Phaser.GameObjects.Container;
+  panel: Phaser.GameObjects.Arc;
+  noteSprite: Phaser.GameObjects.Image;
+  statusText: Phaser.GameObjects.Text;
+}
+
 const NOTATION_TEXTURE_WIDTH = 220;
 const NOTATION_TEXTURE_HEIGHT = 160;
 const NOTATION_TEXTURE_VERSION = 'v11-staff-raised';
-const NOTATION_SCALE = 1.2;
-const NOTATION_BASE_DISPLAY_WIDTH = 160;
-const NOTATION_BASE_DISPLAY_HEIGHT = 122;
+const NOTATION_SCALE = 1.32;
+const NOTATION_BASE_DISPLAY_WIDTH = 144;
+const NOTATION_BASE_DISPLAY_HEIGHT = 112;
 const NOTATION_DISPLAY_WIDTH = Math.round(NOTATION_BASE_DISPLAY_WIDTH * NOTATION_SCALE);
 const NOTATION_DISPLAY_HEIGHT = Math.round(NOTATION_BASE_DISPLAY_HEIGHT * NOTATION_SCALE);
-const INVADER_BODY_RADIUS = Math.round(Math.max(NOTATION_DISPLAY_WIDTH, NOTATION_DISPLAY_HEIGHT) * 0.58);
-const INVADER_INNER_RING_RADIUS = INVADER_BODY_RADIUS - 10;
-const INVADER_HALO_RADIUS = INVADER_BODY_RADIUS + 26;
+const INVADER_BODY_RADIUS = Math.round(Math.max(NOTATION_DISPLAY_WIDTH, NOTATION_DISPLAY_HEIGHT) * 0.5);
+const INVADER_INNER_RING_RADIUS = INVADER_BODY_RADIUS - 8;
+const INVADER_HALO_RADIUS = INVADER_BODY_RADIUS + 18;
 const NOTATION_IN_BODY_SCALE = 0.9;
 const NOTATION_IN_BODY_WIDTH = Math.round(NOTATION_DISPLAY_WIDTH * NOTATION_IN_BODY_SCALE);
 const NOTATION_IN_BODY_HEIGHT = Math.round(NOTATION_DISPLAY_HEIGHT * NOTATION_IN_BODY_SCALE);
@@ -49,6 +56,33 @@ const PROMPT_NOTE_DURATION_MS = 280;
 const PROMPT_NOTE_GAP_MS = 120;
 const PITCH_GLOW_DURATION_MS = 220;
 const PITCH_GLOW_COLOR = 0xa855f7;
+const PLAYED_NOTE_TEXTURE_WIDTH = 300;
+const PLAYED_NOTE_TEXTURE_HEIGHT = 210;
+const PLAYED_NOTE_TEXTURE_VERSION = 'v1-played-note-center';
+const PLAYED_NOTE_DISPLAY_WIDTH = Math.round(186 * 1.1);
+const PLAYED_NOTE_DISPLAY_HEIGHT = Math.round(136 * 1.1);
+const PLAYED_NOTE_PANEL_RADIUS = 124;
+const PLAYED_NOTE_PANEL_INNER_RADIUS = 108;
+const PLAYED_NOTE_FLOAT_PX = 6;
+const PLAYED_NOTE_BOB_DURATION_MS = 1100;
+const INVADER_STAFF_INSET_X = 46;
+const PLAYED_STAFF_INSET_X = 86;
+const PLAYED_NOTE_CORRECT_PALETTE: Partial<StaffRenderPalette> = {
+  staffColor: '#22d3ee',
+  noteColor: '#a3e635',
+  accidentalColor: '#f472b6',
+  gradientStart: '#22d3ee',
+  gradientMiddle: '#a3e635',
+  gradientEnd: '#f472b6',
+};
+const PLAYED_NOTE_WRONG_PALETTE: Partial<StaffRenderPalette> = {
+  staffColor: '#fca5a5',
+  noteColor: '#ef4444',
+  accidentalColor: '#fb7185',
+  gradientStart: '#fca5a5',
+  gradientMiddle: '#ef4444',
+  gradientEnd: '#be123c',
+};
 
 export class GameScene extends Phaser.Scene {
   private arenaConfig = createArenaConfig();
@@ -63,6 +97,8 @@ export class GameScene extends Phaser.Scene {
   private freezeUntil = 0;
   private freezeDurationPendingMs = 0;
   private microphoneSuppressed = false;
+  private playedNoteDisplay: PlayedNoteDisplay | null = null;
+  private playedNoteBaseY = 0;
 
   constructor() {
     super('GameScene');
@@ -91,6 +127,7 @@ export class GameScene extends Phaser.Scene {
     this.setMicrophoneSuppression(false);
 
     this.drawArena();
+    this.createPlayedNoteDisplay();
     this.renderInitialInvaders();
     this.syncPitchPrompts(this.gameState.getState().invaders, this.time.now);
 
@@ -178,6 +215,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (result.kind === 'miss') {
+      this.renderPlayedNote(event.note, false);
       this.playMissPulse();
       this.playScorePopup(this.arenaConfig.centerX, this.arenaConfig.centerY, result.scoreDelta);
       this.freezeForMs(MISS_FREEZE_MS);
@@ -186,6 +224,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (result.kind === 'progress') {
+      this.renderPlayedNote(event.note, true);
       if (this.arenaConfig.mode === 'pitch' && result.target) {
         this.playPitchPromptGlow(result.target.id);
       }
@@ -228,6 +267,7 @@ export class GameScene extends Phaser.Scene {
       this.playPowerUpPulse(result.powerUp.destroyedInvaders);
     }
 
+    this.renderPlayedNote(event.note, true);
     this.publishHud();
   }
 
@@ -244,6 +284,115 @@ export class GameScene extends Phaser.Scene {
     turretOuter.setStrokeStyle(2, 0xf59e0b, 1);
 
     this.add.circle(centerX, centerY, 8, 0xfacc15, 1);
+  }
+
+  private createPlayedNoteDisplay(): void {
+    // Keep this circular and below invaders so crossings remain readable.
+    const panelGlow = this.add.circle(0, 0, PLAYED_NOTE_PANEL_RADIUS + 20, 0x0f172a, 0.3);
+    panelGlow.setStrokeStyle(2, 0x22d3ee, 0.2);
+    panelGlow.setBlendMode(Phaser.BlendModes.ADD);
+
+    const panel = this.add.circle(0, 0, PLAYED_NOTE_PANEL_RADIUS, 0x020617, 0.76);
+    panel.setStrokeStyle(2, 0x22d3ee, 0.86);
+
+    const innerRing = this.add.circle(0, 0, PLAYED_NOTE_PANEL_INNER_RADIUS, 0x0b1220, 0.34);
+    innerRing.setStrokeStyle(1, 0x38bdf8, 0.72);
+
+    const titleText = this.add.text(0, -PLAYED_NOTE_PANEL_RADIUS + 22, 'Last Played', {
+      color: '#e2e8f0',
+      fontSize: '20px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      stroke: '#0f172a',
+      strokeThickness: 4,
+    });
+    titleText.setOrigin(0.5);
+
+    const noteSprite = this.add.image(0, 2, '__WHITE');
+    noteSprite.setDisplaySize(PLAYED_NOTE_DISPLAY_WIDTH, PLAYED_NOTE_DISPLAY_HEIGHT);
+    noteSprite.setVisible(false);
+
+    const statusText = this.add.text(0, PLAYED_NOTE_PANEL_RADIUS - 22, 'Play a note', {
+      color: '#93c5fd',
+      fontSize: '17px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      stroke: '#0f172a',
+      strokeThickness: 4,
+    });
+    statusText.setOrigin(0.5);
+
+    const container = this.add.container(this.arenaConfig.centerX, this.arenaConfig.centerY, [
+      panelGlow,
+      panel,
+      innerRing,
+      titleText,
+      noteSprite,
+      statusText,
+    ]);
+    container.setDepth(0);
+
+    this.playedNoteDisplay = {
+      container,
+      panel,
+      noteSprite,
+      statusText,
+    };
+    this.playedNoteBaseY = this.arenaConfig.centerY;
+
+    this.tweens.add({
+      targets: container,
+      y: this.playedNoteBaseY - PLAYED_NOTE_FLOAT_PX,
+      duration: PLAYED_NOTE_BOB_DURATION_MS,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut',
+    });
+  }
+
+  private renderPlayedNote(note: number, wasCorrect: boolean): void {
+    const display = this.playedNoteDisplay;
+    if (!display) {
+      return;
+    }
+
+    const clef = resolveInvaderClef(this.arenaConfig.clefMode, note, `played-note-${note}`);
+    const textureKey = this.ensurePlayedNoteTexture(note, clef, wasCorrect);
+    display.noteSprite.setVisible(true);
+    display.noteSprite.setScale(0.9);
+
+    if (textureKey === '__MISSING') {
+      display.noteSprite.setTexture('__WHITE');
+      display.noteSprite.setTint(wasCorrect ? 0x86efac : 0xfca5a5);
+    } else {
+      display.noteSprite.setTexture(textureKey);
+      display.noteSprite.clearTint();
+    }
+
+    display.panel.setStrokeStyle(2, wasCorrect ? 0x22d3ee : 0xef4444, wasCorrect ? 0.86 : 0.98);
+    display.statusText.setText(wasCorrect ? 'Correct note' : 'Wrong note');
+    display.statusText.setColor(wasCorrect ? '#86efac' : '#fca5a5');
+
+    this.tweens.killTweensOf(display.noteSprite);
+    this.tweens.add({
+      targets: display.noteSprite,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 160,
+      ease: 'Back.Out',
+    });
+
+    if (!wasCorrect) {
+      display.container.x = this.arenaConfig.centerX;
+      this.tweens.add({
+        targets: display.container,
+        x: this.arenaConfig.centerX + 4,
+        duration: 44,
+        yoyo: true,
+        repeat: 3,
+        ease: 'Sine.InOut',
+      });
+    }
   }
 
   private renderInitialInvaders(): void {
@@ -304,7 +453,31 @@ export class GameScene extends Phaser.Scene {
     }
 
     const canvas = canvasTexture.getCanvas();
-    renderStaffNoteToCanvas(canvas, note, { clef });
+    renderStaffNoteToCanvas(canvas, note, { clef, insetX: INVADER_STAFF_INSET_X });
+    canvasTexture.refresh();
+
+    return textureKey;
+  }
+
+  private ensurePlayedNoteTexture(note: number, clef: StaffClef, wasCorrect: boolean): string {
+    const state = wasCorrect ? 'correct' : 'wrong';
+    const textureKey = `staff-note-${PLAYED_NOTE_TEXTURE_VERSION}-${state}-${clef}-${note}`;
+    if (this.textures.exists(textureKey)) {
+      return textureKey;
+    }
+
+    const canvasTexture = this.textures.createCanvas(
+      textureKey,
+      PLAYED_NOTE_TEXTURE_WIDTH,
+      PLAYED_NOTE_TEXTURE_HEIGHT,
+    );
+    if (!canvasTexture) {
+      return '__MISSING';
+    }
+
+    const palette = wasCorrect ? PLAYED_NOTE_CORRECT_PALETTE : PLAYED_NOTE_WRONG_PALETTE;
+    const canvas = canvasTexture.getCanvas();
+    renderStaffNoteToCanvas(canvas, note, { clef, palette, insetX: PLAYED_STAFF_INSET_X });
     canvasTexture.refresh();
 
     return textureKey;
@@ -661,6 +834,8 @@ export class GameScene extends Phaser.Scene {
 
     this.promptSynth.destroy();
     this.promptScheduler = null;
+    this.playedNoteDisplay?.container.destroy(true);
+    this.playedNoteDisplay = null;
     this.setMicrophoneSuppression(false);
   }
 
