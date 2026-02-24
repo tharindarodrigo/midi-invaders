@@ -4,6 +4,8 @@ import type { AnalyticsInputMode, FeedbackLocation } from '@/types/analytics';
 import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 
+const DISCORD_INVITE_URL = 'https://discord.gg/2pxrcPQU';
+
 interface HudOverlayProps {
   selectedInputMode: AnalyticsInputMode;
   midiSupported: boolean;
@@ -309,6 +311,20 @@ export function HudOverlay({
         onClick={() => onFeedbackLinkClick('hud')}
       >
         Feedback Form
+      </a>
+      <a
+        className="community-link-hud"
+        href={DISCORD_INVITE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg className="community-link-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            fill="currentColor"
+            d="M20.32 4.37a19.8 19.8 0 0 0-4.95-1.54.07.07 0 0 0-.07.03c-.21.38-.44.88-.6 1.27a18.35 18.35 0 0 0-5.39 0c-.16-.4-.4-.9-.61-1.27a.08.08 0 0 0-.08-.03c-1.7.29-3.35.81-4.94 1.54a.08.08 0 0 0-.03.03C.54 7.4-.32 10.34.1 13.24a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 5.96 3.01.08.08 0 0 0 .09-.03c.46-.63.88-1.3 1.24-2a.08.08 0 0 0-.04-.11 13 13 0 0 1-1.9-.91.08.08 0 0 1-.01-.13c.13-.1.26-.2.38-.31a.08.08 0 0 1 .08-.01c4 1.83 8.34 1.83 12.3 0a.08.08 0 0 1 .08.01c.13.11.25.21.38.31a.08.08 0 0 1-.01.13c-.6.35-1.23.65-1.9.91a.08.08 0 0 0-.04.11c.37.7.78 1.37 1.24 2a.08.08 0 0 0 .09.03 19.8 19.8 0 0 0 5.96-3.01.08.08 0 0 0 .03-.06c.5-3.36-.84-6.27-3.52-8.84a.06.06 0 0 0-.03-.03Zm-11.88 7.1c-1.2 0-2.18-1.1-2.18-2.45s.97-2.45 2.18-2.45c1.2 0 2.18 1.1 2.18 2.45 0 1.36-.97 2.45-2.18 2.45Zm7.12 0c-1.2 0-2.18-1.1-2.18-2.45s.97-2.45 2.18-2.45c1.2 0 2.18 1.1 2.18 2.45 0 1.36-.97 2.45-2.18 2.45Z"
+          />
+        </svg>
+        Join our discord community
       </a>
     </aside>
   );

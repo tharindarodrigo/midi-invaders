@@ -24,7 +24,7 @@
 6. Phase 1 analytics are anonymous and exclude personal identifiers.
 
 ### Community
-- Join us on Discord: https://discord.gg/7Z6EWPJk
+- [![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/2pxrcPQU) Join our discord community
 
 ### MIDI hardware test (DGX-670)
 1. Connect Yamaha DGX-670 to your machine over USB.
