@@ -33,6 +33,7 @@ interface HudOverlayProps {
   onStart: () => void;
   onEnd: () => void;
   onRestart: () => void;
+  feedbackFormUrl: string;
 }
 
 const statusLabel = (status: HudOverlayProps['midiStatus']): string => {
@@ -81,6 +82,7 @@ export function HudOverlay({
   onStart,
   onEnd,
   onRestart,
+  feedbackFormUrl,
 }: HudOverlayProps) {
   const runningSession = hud.scene === 'game';
   const activeMode = runningSession ? hud.mode : selectedGameMode;
@@ -282,6 +284,15 @@ export function HudOverlay({
         <button onClick={onEnd}>End Game</button>
         <button onClick={onRestart}>Restart</button>
       </div>
+
+      <a
+        className="feedback-link-hud"
+        href={feedbackFormUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Feedback Form
+      </a>
     </aside>
   );
 }

@@ -24,6 +24,7 @@ import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 import { HudOverlay } from '@/ui/HudOverlay';
 
 const MAX_NOTE_HISTORY = 12;
+const FEEDBACK_FORM_URL = 'https://forms.gle/Boz7dqVw8rJ8KpnN6';
 
 const initialHud: HudState = {
   score: 0,
@@ -343,6 +344,7 @@ export default function App() {
           onStart={startGame}
           onEnd={() => gameBridge.send({ type: 'end' })}
           onRestart={restartGame}
+          feedbackFormUrl={FEEDBACK_FORM_URL}
         />
         <section ref={canvasSectionRef} className="game-canvas-shell" aria-label="Game canvas shell">
           <section id={containerId} className="game-canvas" aria-label="Game canvas" />
@@ -352,6 +354,14 @@ export default function App() {
               <p className="result-line">Score: {hud.score}</p>
               <p className="result-line">Wave Reached: {hud.wave}</p>
               <p className="result-line">Lives Remaining: {livesLabel}</p>
+              <a
+                className="feedback-link-inline"
+                href={FEEDBACK_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Share Feedback
+              </a>
               <button className="game-start-button" onClick={restartGame}>
                 Play Again
               </button>

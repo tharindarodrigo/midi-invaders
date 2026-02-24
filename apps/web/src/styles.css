@@ -227,6 +227,25 @@ body {
   gap: 8px;
 }
 
+.feedback-link-hud {
+  margin-top: 12px;
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgb(34 211 238 / 60%);
+  background: rgb(8 47 73 / 45%);
+  color: #e0f2fe;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.feedback-link-hud:hover {
+  background: rgb(8 47 73 / 72%);
+}
+
 button {
   background: linear-gradient(135deg, #4338ca 0%, #7c3aed 100%);
   border: none;
@@ -318,6 +337,24 @@ button:disabled {
 
 .game-results {
   gap: 8px;
+}
+
+.feedback-link-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 210px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgb(34 211 238 / 55%);
+  background: rgb(8 47 73 / 48%);
+  color: #e0f2fe;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.feedback-link-inline:hover {
+  background: rgb(8 47 73 / 72%);
 }
 
 .result-line {
