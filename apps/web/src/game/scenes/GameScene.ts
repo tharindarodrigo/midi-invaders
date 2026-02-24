@@ -272,10 +272,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawArena(): void {
-    const { centerX, centerY, coreRadius, spawnRadius } = this.arenaConfig;
+    const { centerX, centerY, coreRadius, width, height } = this.arenaConfig;
 
-    const spawnRing = this.add.circle(centerX, centerY, spawnRadius, 0x0b1220, 0.06);
-    spawnRing.setStrokeStyle(1, 0x1e293b, 0.9);
+    const borderFrame = this.add.rectangle(centerX, centerY, width - 8, height - 8, 0x0b1220, 0.04);
+    borderFrame.setStrokeStyle(2, 0x1e293b, 0.95);
+    borderFrame.setDepth(-1);
 
     const coreRing = this.add.circle(centerX, centerY, coreRadius, 0x0891b2, 0.12);
     coreRing.setStrokeStyle(2, 0x22d3ee, 0.8);

@@ -9,7 +9,7 @@ import {
 } from '@/game/systems/radialSpawner';
 
 describe('radial spawner', () => {
-  it('spawns invaders inside canvas bounds and outside the core radius', () => {
+  it('spawns invaders on the canvas borders and outside the core radius', () => {
     const config = createArenaConfig();
     const invader = buildRadialInvader({
       config,
@@ -20,10 +20,12 @@ describe('radial spawner', () => {
       random: () => 0,
     });
 
-    expect(invader.x).toBeGreaterThan(0);
-    expect(invader.x).toBeLessThan(config.width);
-    expect(invader.y).toBeGreaterThan(0);
-    expect(invader.y).toBeLessThan(config.height);
+    const onBorder =
+      invader.x === 0
+      || invader.x === config.width
+      || invader.y === 0
+      || invader.y === config.height;
+    expect(onBorder).toBe(true);
     expect(distanceToCore(invader, config)).toBeGreaterThan(config.coreRadius);
   });
 

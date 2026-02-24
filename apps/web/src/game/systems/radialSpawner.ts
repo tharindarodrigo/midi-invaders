@@ -17,6 +17,31 @@ export const computeMaxInvaders = (config: ArenaConfig, wave: number): number =>
   return config.baseMaxInvaders + (wave - 1);
 };
 
+const pickBorderSpawnPoint = (
+  width: number,
+  height: number,
+  random: () => number,
+): { x: number; y: number } => {
+  const perimeter = 2 * (width + height);
+  let offset = random() * perimeter;
+
+  if (offset < width) {
+    return { x: offset, y: 0 };
+  }
+  offset -= width;
+
+  if (offset < height) {
+    return { x: width, y: offset };
+  }
+  offset -= height;
+
+  if (offset < width) {
+    return { x: width - offset, y: height };
+  }
+
+  return { x: 0, y: height - (offset - width) };
+};
+
 interface BuildInvaderArgs {
   config: ArenaConfig;
   id: string;
@@ -34,9 +59,7 @@ export const buildRadialInvader = ({
   now,
   random,
 }: BuildInvaderArgs): InvaderEntity => {
-  const angle = random() * Math.PI * 2;
-  const x = config.centerX + Math.cos(angle) * config.spawnRadius;
-  const y = config.centerY + Math.sin(angle) * config.spawnRadius;
+  const { x, y } = pickBorderSpawnPoint(config.width, config.height, random);
   const speed = computeInvaderSpeed(config, wave);
 
   const dx = config.centerX - x;
