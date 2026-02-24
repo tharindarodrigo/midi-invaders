@@ -449,6 +449,9 @@ export default function App() {
       ? 'Connect Microphone to Play'
       : 'Connect MIDI to Play';
   const livesLabel = Number.isFinite(hud.lives) ? `${hud.lives}` : '∞';
+  const overlayModeLabel =
+    hud.mode === 'practice' ? 'Practice' : hud.mode === 'pitch' ? 'Pitch Recognition' : 'Arcade';
+  const overlayMissPenalty = hud.mode === 'pitch' ? 25 : 50;
 
   return (
     <main className="app-root">
@@ -511,7 +514,6 @@ export default function App() {
           selectedSpeedMultiplier={selectedSpeedMultiplier}
           selectedLivesMode={selectedLivesMode}
           noteHistory={noteHistory}
-          hud={hud}
           analyticsEnabled={analyticsEnabled}
           onSelectInputMode={handleSelectInputMode}
           onConnectMidi={connectMidi}
@@ -532,6 +534,31 @@ export default function App() {
         />
         <section ref={canvasSectionRef} className="game-canvas-shell" aria-label="Game canvas shell">
           <section id={containerId} className="game-canvas" aria-label="Game canvas" />
+          {hud.scene === 'game' ? (
+            <div className="game-stats-layer" aria-label="Gameplay stats">
+              <aside className="game-stats-panel left">
+                <p>Mode: {overlayModeLabel}</p>
+                <p>Scene: {hud.scene}</p>
+                <p>Wave: {hud.wave}</p>
+                <p>Invaders: {hud.activeInvaders}</p>
+              </aside>
+              <aside className="game-stats-panel right">
+                <p>Score: {hud.score}</p>
+                <p>Lives: {livesLabel}</p>
+                {hud.lifeUpsEnabled ? (
+                  <>
+                    <p>1UP Meter: {hud.lifeScore}/1000</p>
+                    <p>Miss penalty: -{overlayMissPenalty} score, -{overlayMissPenalty} 1UP, +1s freeze</p>
+                  </>
+                ) : (
+                  <>
+                    <p>1UP Meter: Disabled</p>
+                    <p>Miss penalty: -{overlayMissPenalty} score, +1s freeze</p>
+                  </>
+                )}
+              </aside>
+            </div>
+          ) : null}
           {hud.scene === 'game-over' ? (
             <div className="game-instructions game-results" aria-label="Game results">
               <h2>Game Over</h2>

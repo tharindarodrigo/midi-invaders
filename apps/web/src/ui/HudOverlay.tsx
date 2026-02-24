@@ -1,7 +1,6 @@
 import type { ClefMode, DifficultyLevel, GameMode, LivesMode } from '@/types/gameplay';
 import { noteNumberToName } from '@/services/note';
 import type { AnalyticsInputMode, FeedbackLocation } from '@/types/analytics';
-import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 
 const DISCORD_INVITE_URL = 'https://discord.gg/2pxrcPQU';
@@ -22,7 +21,6 @@ interface HudOverlayProps {
   selectedSpeedMultiplier: number;
   selectedLivesMode: LivesMode;
   noteHistory: InputNoteEvent[];
-  hud: HudState;
   analyticsEnabled: boolean;
   onSelectInputMode: (mode: AnalyticsInputMode) => void;
   onConnectMidi: () => void;
@@ -74,7 +72,6 @@ export function HudOverlay({
   selectedSpeedMultiplier,
   selectedLivesMode,
   noteHistory,
-  hud,
   analyticsEnabled,
   onSelectInputMode,
   onConnectMidi,
@@ -93,15 +90,6 @@ export function HudOverlay({
   onRestart,
   feedbackFormUrl,
 }: HudOverlayProps) {
-  const runningSession = hud.scene === 'game';
-  const activeMode = runningSession ? hud.mode : selectedGameMode;
-  const lifeUpsEnabled = runningSession
-    ? hud.lifeUpsEnabled
-    : !(selectedGameMode === 'practice' && selectedLivesMode === 'infinite');
-  const isPitchMode = activeMode === 'pitch';
-  const missPenalty = isPitchMode ? 25 : 50;
-  const livesLabel = runningSession && !Number.isFinite(hud.lives) ? '∞' : `${hud.lives}`;
-
   return (
     <aside className="hud-panel">
       <div className="hud-title">
@@ -274,26 +262,6 @@ export function HudOverlay({
         <span>Enable anonymous analytics</span>
       </label>
       <p className="analytics-note">Helps improve gameplay balance and onboarding. No personal data is tracked.</p>
-
-      <p>Mode: {activeMode === 'practice' ? 'Practice' : activeMode === 'pitch' ? 'Pitch Recognition' : 'Arcade'}</p>
-      <p>Scene: {hud.scene}</p>
-      <p>Wave: {hud.wave}</p>
-      <p>Score: {hud.score}</p>
-      <p>Lives: {livesLabel}</p>
-      <p>Invaders: {hud.activeInvaders}</p>
-      {lifeUpsEnabled ? (
-        <>
-          <p>1UP Meter: {hud.lifeScore}/1000</p>
-          <p>Miss penalty: -{missPenalty} score, -{missPenalty} 1UP meter, +1s freeze</p>
-          <p>Life-up power-up: center green pulse clears nearest 5 invaders</p>
-        </>
-      ) : (
-        <>
-          <p>1UP Meter: Disabled</p>
-          <p>Miss penalty: -{missPenalty} score, +1s freeze</p>
-          <p>Infinite-lives practice disables 1UP and pulse power-up.</p>
-        </>
-      )}
 
       <h2 className="subheading">Recent Notes</h2>
       <ul className="note-list">
