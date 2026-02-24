@@ -1,6 +1,7 @@
 import type { ClefMode, DifficultyLevel, GameMode, LivesMode } from '@/types/gameplay';
 import { noteNumberToName } from '@/services/note';
-import type { AnalyticsInputMode, FeedbackLocation } from '@/types/analytics';
+import type { AnalyticsInputMode } from '@/types/analytics';
+import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 
 const DISCORD_INVITE_URL = 'https://discord.gg/2pxrcPQU';
@@ -20,6 +21,7 @@ interface HudOverlayProps {
   selectedClefMode: ClefMode;
   selectedSpeedMultiplier: number;
   selectedLivesMode: LivesMode;
+  currentScene: HudState['scene'];
   noteHistory: InputNoteEvent[];
   analyticsEnabled: boolean;
   onSelectInputMode: (mode: AnalyticsInputMode) => void;
@@ -32,12 +34,12 @@ interface HudOverlayProps {
   onSelectSpeedMultiplier: (multiplier: number) => void;
   onSelectLivesMode: (livesMode: LivesMode) => void;
   onToggleAnalytics: (enabled: boolean) => void;
-  onFeedbackLinkClick: (location: FeedbackLocation) => void;
+  onOpenFeedbackPanel: () => void;
+  feedbackPanelLabel: string;
   canStart: boolean;
   onStart: () => void;
   onEnd: () => void;
   onRestart: () => void;
-  feedbackFormUrl: string;
 }
 
 const statusLabel = (status: HudOverlayProps['midiStatus']): string => {
@@ -71,6 +73,7 @@ export function HudOverlay({
   selectedClefMode,
   selectedSpeedMultiplier,
   selectedLivesMode,
+  currentScene,
   noteHistory,
   analyticsEnabled,
   onSelectInputMode,
@@ -83,12 +86,12 @@ export function HudOverlay({
   onSelectSpeedMultiplier,
   onSelectLivesMode,
   onToggleAnalytics,
-  onFeedbackLinkClick,
+  onOpenFeedbackPanel,
+  feedbackPanelLabel,
   canStart,
   onStart,
   onEnd,
   onRestart,
-  feedbackFormUrl,
 }: HudOverlayProps) {
   return (
     <aside className="hud-panel">
@@ -280,16 +283,11 @@ export function HudOverlay({
         <button onClick={onEnd}>End Game</button>
         <button onClick={onRestart}>Restart</button>
       </div>
-
-      <a
-        className="feedback-link-hud"
-        href={feedbackFormUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => onFeedbackLinkClick('hud')}
-      >
-        Feedback Form
-      </a>
+      {currentScene === 'game-over' ? (
+        <button className="feedback-link-hud-btn" onClick={onOpenFeedbackPanel} type="button">
+          {feedbackPanelLabel}
+        </button>
+      ) : null}
       <a
         className="community-link-hud"
         href={DISCORD_INVITE_URL}

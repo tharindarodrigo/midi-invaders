@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { FeedbackSubmitRequest } from '@midi-invaders/shared';
 import { createGameConfig } from '@/game/config';
 import { gameBridge } from '@/game/gameBridge';
 import {
@@ -7,6 +8,11 @@ import {
   setAnalyticsEnabled as setAnalyticsEnabledPreference,
   trackAnalyticsEvent,
 } from '@/services/analytics';
+import {
+  createSessionForGameplay,
+  issueFeedbackToken,
+  submitFeedback,
+} from '@/services/api';
 import {
   canStartWithInputMode,
   resolvePreferredInputMode,
@@ -31,15 +37,16 @@ import type {
 import type {
   AnalyticsGameEndReason,
   AnalyticsInputMode,
-  FeedbackLocation,
 } from '@/types/analytics';
 import type { HudState } from '@/types/hud';
 import type { InputNoteEvent, MidiInputDevice } from '@/types/input';
 import { HudOverlay } from '@/ui/HudOverlay';
 
 const MAX_NOTE_HISTORY = 12;
-const FEEDBACK_FORM_URL = 'https://forms.gle/Boz7dqVw8rJ8KpnN6';
 const DISCORD_INVITE_URL = 'https://discord.gg/2pxrcPQU';
+const FEEDBACK_FORM_LOCATION = 'game_over';
+
+type FeedbackFormStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 const initialHud: HudState = {
   score: 0,
@@ -57,6 +64,21 @@ interface ActiveAnalyticsSession {
   startedAtMs: number;
   inputMode: AnalyticsInputMode;
   settings: GameplaySettings;
+}
+
+interface CompletedRunSnapshot {
+  inputMode: AnalyticsInputMode;
+  settings: GameplaySettings;
+  durationMs: number;
+  score: number;
+  wave: number;
+}
+
+interface BackendFeedbackSession {
+  sessionId: string;
+  token: string | null;
+  tokenExpiresAtMs: number;
+  startedAtMs: number;
 }
 
 const getNowMs = (): number =>
@@ -99,6 +121,12 @@ export default function App() {
   const [selectedLivesMode, setSelectedLivesMode] = useState<LivesMode>(DEFAULT_GAMEPLAY_SETTINGS.livesMode);
   const [analyticsEnabled, setAnalyticsEnabledState] = useState<boolean>(() => isAnalyticsEnabled());
   const [noteHistory, setNoteHistory] = useState<InputNoteEvent[]>([]);
+  const [feedbackRating, setFeedbackRating] = useState<1 | 2 | 3 | 4 | 5 | 0>(0);
+  const [feedbackHoverRating, setFeedbackHoverRating] = useState<1 | 2 | 3 | 4 | 5 | 0>(0);
+  const [feedbackMessage, setFeedbackMessage] = useState<string>('');
+  const [feedbackFormStatus, setFeedbackFormStatus] = useState<FeedbackFormStatus>('idle');
+  const [feedbackFormMessage, setFeedbackFormMessage] = useState<string | null>(null);
+  const [isFeedbackPanelVisible, setIsFeedbackPanelVisible] = useState<boolean>(true);
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
   const selectedInputModeRef = useRef<AnalyticsInputMode>(initialInputMode);
   const selectedMidiInputIdRef = useRef<string | null>(null);
@@ -107,6 +135,8 @@ export default function App() {
   const previousHudSceneRef = useRef<HudState['scene']>(initialHud.scene);
   const lastGameHudRef = useRef<HudState>(initialHud);
   const activeAnalyticsSessionRef = useRef<ActiveAnalyticsSession | null>(null);
+  const lastCompletedRunRef = useRef<CompletedRunSnapshot | null>(null);
+  const backendFeedbackSessionRef = useRef<BackendFeedbackSession | null>(null);
 
   const canStartGame = canStartWithInputMode(selectedInputMode, midiStatus, selectedInputId, microphoneStatus);
   const gameplaySettings = useMemo<GameplaySettings>(
@@ -126,6 +156,57 @@ export default function App() {
       selectedLivesMode,
     ],
   );
+
+  const resetFeedbackForm = useCallback(() => {
+    setFeedbackRating(0);
+    setFeedbackHoverRating(0);
+    setFeedbackMessage('');
+    setFeedbackFormStatus('idle');
+    setFeedbackFormMessage(null);
+    setIsFeedbackPanelVisible(true);
+  }, []);
+
+  const beginBackendFeedbackSession = useCallback(async (settings: GameplaySettings) => {
+    try {
+      const session = await createSessionForGameplay(settings);
+      const token = await issueFeedbackToken(session.sessionId);
+      backendFeedbackSessionRef.current = {
+        sessionId: session.sessionId,
+        token: token.token,
+        tokenExpiresAtMs: new Date(token.expiresAt).getTime(),
+        startedAtMs: getNowMs(),
+      };
+    } catch (error) {
+      backendFeedbackSessionRef.current = null;
+      if (error instanceof Error) {
+        setFeedbackFormMessage(error.message);
+      } else {
+        setFeedbackFormMessage('Feedback service is unavailable right now.');
+      }
+    }
+  }, []);
+
+  const ensureFeedbackToken = useCallback(async (sessionId: string): Promise<string> => {
+    const active = backendFeedbackSessionRef.current;
+    if (
+      active
+      && active.sessionId === sessionId
+      && active.token
+      && Date.now() < active.tokenExpiresAtMs - 1000
+    ) {
+      return active.token;
+    }
+
+    const refreshed = await issueFeedbackToken(sessionId);
+    backendFeedbackSessionRef.current = {
+      sessionId,
+      token: refreshed.token,
+      tokenExpiresAtMs: new Date(refreshed.expiresAt).getTime(),
+      startedAtMs: active?.startedAtMs ?? getNowMs(),
+    };
+
+    return refreshed.token;
+  }, []);
 
   const trackGameStarted = useCallback(
     (trigger: 'start' | 'restart') => {
@@ -171,6 +252,14 @@ export default function App() {
       speed_multiplier: activeSession.settings.speedMultiplier,
       lives_mode: activeSession.settings.livesMode,
     });
+
+    lastCompletedRunRef.current = {
+      inputMode: activeSession.inputMode,
+      settings: activeSession.settings,
+      durationMs,
+      score: summary.score,
+      wave: summary.wave,
+    };
 
     activeAnalyticsSessionRef.current = null;
   }, []);
@@ -324,9 +413,69 @@ export default function App() {
     });
   }, []);
 
-  const handleFeedbackFormOpen = useCallback((location: FeedbackLocation) => {
-    trackAnalyticsEvent('feedback_form_opened', { location });
-  }, []);
+  const handleFeedbackSubmit = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (feedbackRating < 1 || feedbackRating > 5) {
+      setFeedbackFormStatus('error');
+      setFeedbackFormMessage('Please choose a star rating before submitting.');
+      return;
+    }
+
+    const feedbackSession = backendFeedbackSessionRef.current;
+    if (!feedbackSession) {
+      setFeedbackFormStatus('error');
+      setFeedbackFormMessage('Feedback is unavailable for this round. Please start a new game first.');
+      return;
+    }
+
+    setFeedbackFormStatus('submitting');
+    setFeedbackFormMessage(null);
+    trackAnalyticsEvent('feedback_submission_attempted', { location: FEEDBACK_FORM_LOCATION });
+
+    const completedRun = lastCompletedRunRef.current;
+    const hudSnapshot = lastGameHudRef.current;
+    const rating = feedbackRating as 1 | 2 | 3 | 4 | 5;
+
+    try {
+      const token = await ensureFeedbackToken(feedbackSession.sessionId);
+      const payload: FeedbackSubmitRequest = {
+        sessionId: feedbackSession.sessionId,
+        token,
+        rating,
+        feedback: feedbackMessage.trim(),
+        honeypot: '',
+        mode: completedRun?.settings.mode ?? gameplaySettings.mode,
+        difficulty: completedRun?.settings.difficulty ?? gameplaySettings.difficulty,
+        wave: Math.max(0, completedRun?.wave ?? hudSnapshot.wave),
+        score: Math.max(0, completedRun?.score ?? hudSnapshot.score),
+        durationMs: Math.max(
+          0,
+          completedRun?.durationMs
+          ?? Math.round(getNowMs() - feedbackSession.startedAtMs),
+        ),
+        inputMode: completedRun?.inputMode ?? selectedInputModeRef.current,
+      };
+
+      await submitFeedback(payload);
+      setFeedbackFormStatus('success');
+      setFeedbackFormMessage('Thank you. Your feedback was received and queued for personal review.');
+      setIsFeedbackPanelVisible(false);
+      trackAnalyticsEvent('feedback_submitted', {
+        location: FEEDBACK_FORM_LOCATION,
+        rating,
+        has_message: payload.feedback.length > 0,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to submit feedback right now.';
+      setFeedbackFormStatus('error');
+      setFeedbackFormMessage(message);
+      trackAnalyticsEvent('feedback_submit_failed', {
+        location: FEEDBACK_FORM_LOCATION,
+        error_name: error instanceof Error ? (error.name || 'Error') : 'unknown_error',
+      });
+    }
+  }, [ensureFeedbackToken, feedbackMessage, feedbackRating, gameplaySettings]);
 
   useEffect(() => {
     selectedInputModeRef.current = selectedInputMode;
@@ -410,6 +559,8 @@ export default function App() {
       gameRef.current?.destroy(true);
       gameRef.current = null;
       activeAnalyticsSessionRef.current = null;
+      lastCompletedRunRef.current = null;
+      backendFeedbackSessionRef.current = null;
     };
   }, [handleInputEvent]);
 
@@ -422,8 +573,12 @@ export default function App() {
       trackGameStarted('start');
     }
 
+    resetFeedbackForm();
+    lastCompletedRunRef.current = null;
+    backendFeedbackSessionRef.current = null;
     gameBridge.send({ type: 'start', settings: gameplaySettings });
-  }, [gameplaySettings, trackGameStarted]);
+    void beginBackendFeedbackSession(gameplaySettings);
+  }, [beginBackendFeedbackSession, gameplaySettings, resetFeedbackForm, trackGameStarted]);
 
   const restartGame = useCallback(() => {
     const currentScene = hudRef.current.scene;
@@ -435,8 +590,12 @@ export default function App() {
       trackGameStarted('restart');
     }
 
+    resetFeedbackForm();
+    lastCompletedRunRef.current = null;
+    backendFeedbackSessionRef.current = null;
     gameBridge.send({ type: 'restart', settings: gameplaySettings });
-  }, [gameplaySettings, trackGameEnded, trackGameStarted]);
+    void beginBackendFeedbackSession(gameplaySettings);
+  }, [beginBackendFeedbackSession, gameplaySettings, resetFeedbackForm, trackGameEnded, trackGameStarted]);
 
   const endGame = useCallback(() => {
     if (hudRef.current.scene === 'game') {
@@ -476,6 +635,9 @@ export default function App() {
   const livesLabel = Number.isFinite(hud.lives) ? `${hud.lives}` : '∞';
   const overlayMissPenalty = hud.mode === 'pitch' ? 25 : 50;
   const gameplayFocusedLayout = hud.scene === 'game';
+  const feedbackVisibleRating = feedbackHoverRating > 0 ? feedbackHoverRating : feedbackRating;
+  const hasSubmittedFeedback = feedbackFormStatus === 'success';
+  const feedbackPanelLabel = hasSubmittedFeedback ? 'View Feedback Status' : 'Open Feedback Form';
 
   return (
     <main className="app-root">
@@ -552,6 +714,7 @@ export default function App() {
             selectedClefMode={selectedClefMode}
             selectedSpeedMultiplier={selectedSpeedMultiplier}
             selectedLivesMode={selectedLivesMode}
+            currentScene={hud.scene}
             noteHistory={noteHistory}
             analyticsEnabled={analyticsEnabled}
             onSelectInputMode={handleSelectInputMode}
@@ -564,12 +727,12 @@ export default function App() {
             onSelectSpeedMultiplier={setSelectedSpeedMultiplier}
             onSelectLivesMode={setSelectedLivesMode}
             onToggleAnalytics={handleToggleAnalytics}
-            onFeedbackLinkClick={handleFeedbackFormOpen}
+            onOpenFeedbackPanel={() => setIsFeedbackPanelVisible(true)}
+            feedbackPanelLabel={feedbackPanelLabel}
             canStart={canStartGame}
             onStart={startGame}
             onEnd={endGame}
             onRestart={restartGame}
-            feedbackFormUrl={FEEDBACK_FORM_URL}
           />
         </div>
         <section ref={canvasSectionRef} className="game-canvas-shell" aria-label="Game canvas shell">
@@ -616,15 +779,84 @@ export default function App() {
               <p className="result-line">Score: {hud.score}</p>
               <p className="result-line">Wave Reached: {hud.wave}</p>
               <p className="result-line">Lives Remaining: {livesLabel}</p>
-              <a
-                className="feedback-link-inline"
-                href={FEEDBACK_FORM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => handleFeedbackFormOpen('game_over')}
-              >
-                Share Feedback
-              </a>
+              {isFeedbackPanelVisible ? (
+                hasSubmittedFeedback ? (
+                  <div className="feedback-form-inline">
+                    <p className="feedback-form-copy">
+                      Thank you. Your feedback has been received and queued for personal review.
+                    </p>
+                    <p className="feedback-form-copy">
+                      We personally review every submission and continuously tune the gameplay from this feedback.
+                    </p>
+                  </div>
+                ) : (
+                  <form className="feedback-form-inline" onSubmit={handleFeedbackSubmit}>
+                    <p className="feedback-form-copy">
+                      We are continuously reviewing and improving the quality of the gameplay experience.
+                      Share what kept you engaged or where you dropped off.
+                    </p>
+                    <p className="feedback-form-copy">
+                      Every submission is personally reviewed by our team. We do not use AI to review player feedback.
+                    </p>
+                    <label className="feedback-label" htmlFor="feedback-rating">
+                      Overall Experience
+                    </label>
+                    <div
+                      id="feedback-rating"
+                      className="feedback-stars"
+                      role="radiogroup"
+                      aria-label="Overall experience rating"
+                      onMouseLeave={() => setFeedbackHoverRating(0)}
+                    >
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          className={`feedback-star ${feedbackVisibleRating >= star ? 'is-active' : ''}`}
+                          type="button"
+                          role="radio"
+                          aria-checked={feedbackRating === star}
+                          onMouseEnter={() => setFeedbackHoverRating(star as 1 | 2 | 3 | 4 | 5)}
+                          onClick={() => setFeedbackRating(star as 1 | 2 | 3 | 4 | 5)}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                    <label className="feedback-label" htmlFor="feedback-message">
+                      Feedback
+                    </label>
+                    <textarea
+                      id="feedback-message"
+                      className="feedback-textarea"
+                      maxLength={1200}
+                      value={feedbackMessage}
+                      onChange={(event) => setFeedbackMessage(event.target.value)}
+                      placeholder="Tell us what felt fun, frustrating, or confusing."
+                    />
+                    <input
+                      className="feedback-honeypot"
+                      type="text"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      value=""
+                      readOnly
+                    />
+                    {feedbackFormMessage ? (
+                      <p className={`feedback-form-status ${feedbackFormStatus === 'success' ? 'is-success' : 'is-error'}`}>
+                        {feedbackFormMessage}
+                      </p>
+                    ) : null}
+                    <button
+                      className="feedback-submit-button"
+                      type="submit"
+                      disabled={feedbackFormStatus === 'submitting' || feedbackRating === 0}
+                    >
+                      {feedbackFormStatus === 'submitting' ? 'Submitting...' : 'Submit Feedback'}
+                    </button>
+                  </form>
+                )
+              ) : null}
               <a
                 className="community-link-inline"
                 href={DISCORD_INVITE_URL}

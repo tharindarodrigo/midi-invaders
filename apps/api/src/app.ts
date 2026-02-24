@@ -7,6 +7,7 @@ import { registerHealthRoutes } from '@/routes/health';
 import { registerSessionRoutes } from '@/routes/sessions';
 import { registerScoreRoutes } from '@/routes/scores';
 import { registerLeaderboardRoutes } from '@/routes/leaderboards';
+import { registerFeedbackRoutes } from '@/routes/feedback';
 
 interface BuildAppOptions {
   repository?: ApiRepository;
@@ -28,6 +29,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
       await registerSessionRoutes(api);
       await registerScoreRoutes(api);
       await registerLeaderboardRoutes(api);
+      await registerFeedbackRoutes(api);
     }, { prefix: '/api' });
   });
 

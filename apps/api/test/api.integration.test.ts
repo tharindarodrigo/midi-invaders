@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildAppForTests } from '@/app';
@@ -71,5 +72,78 @@ describe('API integration', () => {
     const body = leaderboard.json();
     expect(body.entries).toHaveLength(3);
     expect(body.entries.map((entry: { score: number }) => entry.score)).toEqual([1500, 1000, 600]);
+  });
+
+  it('issues feedback tokens and stores one feedback submission per session', async () => {
+    const sessionResponse = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/start',
+      payload: { mode: 'classic', difficulty: 'easy' },
+    });
+    const { sessionId } = sessionResponse.json();
+
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/api/feedback/token',
+      payload: { sessionId },
+    });
+
+    expect(tokenResponse.statusCode).toBe(200);
+    const tokenBody = tokenResponse.json();
+    expect(tokenBody.token).toEqual(expect.any(String));
+    expect(tokenBody.expiresAt).toEqual(expect.any(String));
+
+    await app.repository.upsertFeedbackToken({
+      sessionId,
+      tokenHash: createHash('sha256').update(tokenBody.token).digest('hex'),
+      issuedAt: new Date(Date.now() - 10_000).toISOString(),
+      expiresAt: tokenBody.expiresAt,
+      issuedIpHash: null,
+      issuedUserAgentHash: null,
+    });
+
+    const submitResponse = await app.inject({
+      method: 'POST',
+      url: '/api/feedback/submit',
+      payload: {
+        sessionId,
+        token: tokenBody.token,
+        rating: 5,
+        feedback: 'Great flow and readability on mobile.',
+        honeypot: '',
+        mode: 'arcade',
+        difficulty: 1,
+        wave: 4,
+        score: 1200,
+        durationMs: 68000,
+        inputMode: 'microphone',
+      },
+    });
+
+    expect(submitResponse.statusCode).toBe(200);
+    expect(submitResponse.json()).toEqual({
+      ok: true,
+      feedbackId: expect.any(String),
+    });
+
+    const duplicateSubmitResponse = await app.inject({
+      method: 'POST',
+      url: '/api/feedback/submit',
+      payload: {
+        sessionId,
+        token: tokenBody.token,
+        rating: 4,
+        feedback: 'Second attempt should be blocked.',
+        honeypot: '',
+        mode: 'arcade',
+        difficulty: 1,
+        wave: 4,
+        score: 1200,
+        durationMs: 68000,
+        inputMode: 'microphone',
+      },
+    });
+
+    expect(duplicateSubmitResponse.statusCode).toBe(409);
   });
 });

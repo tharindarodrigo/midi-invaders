@@ -15,15 +15,17 @@
 3. `cp apps/api/.env.example apps/api/.env` and set `DATABASE_URL`
 4. `pnpm -C apps/api exec prisma migrate dev --name init`
 5. `pnpm -C apps/web dev` (web client on Vite)
-6. `pnpm -C apps/api dev` (API on `http://localhost:3001`)
+6. `pnpm -C apps/api dev` (API on `http://localhost:3101`)
 
 ### Web analytics (optional)
 1. `cp apps/web/.env.example apps/web/.env`
 2. Set `VITE_POSTHOG_KEY` (leave blank to disable analytics).
 3. Optional: set `VITE_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`).
-4. Analytics events are sent only for production builds when a PostHog key is configured and analytics is enabled.
-5. Default preference respects browser Do Not Track (`navigator.doNotTrack === "1"` disables tracking unless user enables it in the HUD).
-6. Phase 1 analytics are anonymous and exclude personal identifiers.
+4. Optional: set `VITE_API_BASE_URL` for custom API hosts (defaults to `/api`).
+5. Optional for Vite dev proxy: set `VITE_API_PROXY_TARGET` (defaults to `http://localhost:3101`).
+6. Analytics events are sent only for production builds when a PostHog key is configured and analytics is enabled.
+7. Default preference respects browser Do Not Track (`navigator.doNotTrack === "1"` disables tracking unless user enables it in the HUD).
+8. Phase 1 analytics are anonymous and exclude personal identifiers.
 
 ### Community
 - [![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/2pxrcPQU) Join our discord community
@@ -60,6 +62,9 @@
 - Mobile canvas sizing now uses larger gameplay presets and aspect-preserving rendering so invaders remain readable on phones.
 - Invader approach speed now scales by arena travel distance so time-to-center stays consistent across screen sizes.
 - Arcade mode now keeps invader travel speed constant within a run and ends after a finite wave cap per difficulty.
+- Game Over now includes an in-app feedback form with 1-5 stars plus optional written feedback.
+- Feedback copy clearly states submissions are personally reviewed by the team (no AI auto-review).
+- Feedback API uses session-bound tokens, one submission per session, honeypot checks, and endpoint rate limits to reduce bot spam.
 - In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
 - Microphone pitch note events now require a short stability window (3 consecutive frames, about 50ms) to reduce note jitter from instrument overtones.
 - Computer keyboard mode now plays synthesized note audio on key press/release.

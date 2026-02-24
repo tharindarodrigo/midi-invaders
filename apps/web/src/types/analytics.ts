@@ -4,7 +4,7 @@ export type AnalyticsInputMode = 'keyboard' | 'midi' | 'microphone';
 export type AnalyticsPreferenceSource = 'hud_toggle';
 export type AnalyticsGameStartTrigger = 'start' | 'restart';
 export type AnalyticsGameEndReason = 'game_over' | 'manual_end' | 'restart';
-export type FeedbackLocation = 'hud' | 'game_over';
+export type FeedbackLocation = 'game_over';
 export type AnalyticsScene = 'menu' | 'game' | 'game-over';
 
 interface GameplayEventContext {
@@ -53,8 +53,17 @@ export interface AnalyticsEventProps {
     wave: number;
     lives: number;
   };
-  feedback_form_opened: {
+  feedback_submission_attempted: {
     location: FeedbackLocation;
+  };
+  feedback_submitted: {
+    location: FeedbackLocation;
+    rating: 1 | 2 | 3 | 4 | 5;
+    has_message: boolean;
+  };
+  feedback_submit_failed: {
+    location: FeedbackLocation;
+    error_name: string;
   };
 }
 

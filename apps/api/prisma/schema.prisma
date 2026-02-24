@@ -8,13 +8,15 @@ datasource db {
 }
 
 model GameSession {
-  id        String   @id @default(cuid())
-  seed      Int
-  mode      String
-  difficulty String
-  createdAt DateTime @default(now())
-  expiresAt DateTime
-  scores    ScoreSubmission[]
+  id                  String               @id @default(cuid())
+  seed                Int
+  mode                String
+  difficulty          String
+  createdAt           DateTime             @default(now())
+  expiresAt           DateTime
+  scores              ScoreSubmission[]
+  feedbackToken       FeedbackToken?
+  feedbackSubmissions FeedbackSubmission[]
 }
 
 model ScoreSubmission {
@@ -32,4 +34,41 @@ model ScoreSubmission {
 
   @@index([mode, difficulty, score(sort: Desc)])
   @@index([createdAt])
+}
+
+model FeedbackToken {
+  id                String    @id @default(cuid())
+  sessionId         String    @unique
+  tokenHash         String
+  issuedAt          DateTime  @default(now())
+  expiresAt         DateTime
+  usedAt            DateTime?
+  issuedIpHash      String?
+  issuedUserAgentHash String?
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model FeedbackSubmission {
+  id           String   @id @default(cuid())
+  sessionId    String   @unique
+  rating       Int
+  feedback     String
+  mode         String
+  difficulty   Int
+  wave         Int
+  score        Int
+  durationMs   Int
+  inputMode    String
+  ipHash       String?
+  userAgentHash String?
+  riskFlags    String[]
+  createdAt    DateTime @default(now())
+
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([mode, difficulty, rating])
 }

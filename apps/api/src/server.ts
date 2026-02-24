@@ -4,7 +4,7 @@ import { buildApp } from '@/app';
 const resolvePort = (): number => {
   const rawPort = process.env.PORT;
   if (!rawPort) {
-    return 3001;
+    return 3101;
   }
 
   const parsed = Number(rawPort);
