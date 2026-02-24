@@ -456,38 +456,42 @@ export default function App() {
   return (
     <main className="app-root">
       <section className="landing-hero" aria-label="MIDI Invaders introduction">
-        <img
-          className="brand-logo-hero"
-          src="/logo.png"
-          alt="MIDI Invaders logo"
-          onError={(event) => {
-            event.currentTarget.style.display = 'none';
-          }}
-        />
-        <p className="eyebrow">Free Online • Browser Arcade</p>
-        <h1>MIDI Invaders</h1>
-        <p className="hero-copy">
-          Defend the galaxy with your keyboard. Match incoming notes, keep your combo alive, and climb the global leaderboard.
-        </p>
-        <div className="hero-actions">
-          <button
-            className="hero-button primary"
-            disabled={!canStartGame}
-            onClick={() => {
-              canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              if (canStartGame) {
-                startGame();
-              }
+        <div className="hero-layout">
+          <div className="hero-content">
+            <p className="eyebrow">Free Online • Browser Arcade</p>
+            <h1>MIDI Invaders</h1>
+            <p className="hero-copy">
+              Defend the galaxy with your keyboard. Match incoming notes, keep your combo alive, and climb the global leaderboard.
+            </p>
+            <div className="hero-actions">
+              <button
+                className="hero-button primary"
+                disabled={!canStartGame}
+                onClick={() => {
+                  canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  if (canStartGame) {
+                    startGame();
+                  }
+                }}
+              >
+                Play Now
+              </button>
+              <button
+                className="hero-button ghost"
+                onClick={() => canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                Setup Inputs
+              </button>
+            </div>
+          </div>
+          <img
+            className="brand-logo-hero"
+            src="/logo.png"
+            alt="MIDI Invaders logo"
+            onError={(event) => {
+              event.currentTarget.style.display = 'none';
             }}
-          >
-            Play Now
-          </button>
-          <button
-            className="hero-button ghost"
-            onClick={() => canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            Setup Inputs
-          </button>
+          />
         </div>
         <div className="hero-tags" aria-label="Feature highlights">
           <span>Arcade Waves</span>
@@ -537,23 +541,43 @@ export default function App() {
           {hud.scene === 'game' ? (
             <div className="game-stats-layer" aria-label="Gameplay stats">
               <aside className="game-stats-panel left">
-                <p>Mode: {overlayModeLabel}</p>
-                <p>Scene: {hud.scene}</p>
-                <p>Wave: {hud.wave}</p>
-                <p>Invaders: {hud.activeInvaders}</p>
+                <p className="game-stat-row">
+                  <span className="game-stat-label">Mode</span>
+                  <span className="game-stat-value">{overlayModeLabel}</span>
+                </p>
+                <p className="game-stat-row">
+                  <span className="game-stat-label">Wave</span>
+                  <span className="game-stat-value">{hud.wave}</span>
+                </p>
+                <p className="game-stat-row">
+                  <span className="game-stat-label">Invaders</span>
+                  <span className="game-stat-value">{hud.activeInvaders}</span>
+                </p>
               </aside>
               <aside className="game-stats-panel right">
-                <p>Score: {hud.score}</p>
-                <p>Lives: {livesLabel}</p>
+                <p className="game-score-title">Score</p>
+                <p className="game-score-value">{hud.score.toLocaleString()}</p>
+                <p className="game-stat-row">
+                  <span className="game-stat-label">Lives</span>
+                  <span className="game-stat-value">{livesLabel}</span>
+                </p>
                 {hud.lifeUpsEnabled ? (
                   <>
-                    <p>1UP Meter: {hud.lifeScore}/1000</p>
-                    <p>Miss penalty: -{overlayMissPenalty} score, -{overlayMissPenalty} 1UP, +1s freeze</p>
+                    <p className="game-stat-row">
+                      <span className="game-stat-label">1UP Meter</span>
+                      <span className="game-stat-value">{hud.lifeScore}/1000</span>
+                    </p>
+                    <p className="game-stat-note">
+                      Miss: -{overlayMissPenalty} score, -{overlayMissPenalty} 1UP, +1s freeze
+                    </p>
                   </>
                 ) : (
                   <>
-                    <p>1UP Meter: Disabled</p>
-                    <p>Miss penalty: -{overlayMissPenalty} score, +1s freeze</p>
+                    <p className="game-stat-row">
+                      <span className="game-stat-label">1UP Meter</span>
+                      <span className="game-stat-value">Disabled</span>
+                    </p>
+                    <p className="game-stat-note">Miss: -{overlayMissPenalty} score, +1s freeze</p>
                   </>
                 )}
               </aside>
