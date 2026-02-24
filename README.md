@@ -1,5 +1,7 @@
 # MIDI Invaders (Web) — Detailed Requirements + Step-by-step Build Plan
 
+![MIDI Invaders Logo](apps/web/public/logo.png)
+
 ## Quickstart (Current Scaffold)
 
 ### Monorepo layout

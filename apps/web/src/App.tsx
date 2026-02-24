@@ -453,6 +453,14 @@ export default function App() {
   return (
     <main className="app-root">
       <section className="landing-hero" aria-label="MIDI Invaders introduction">
+        <img
+          className="brand-logo-hero"
+          src="/logo.png"
+          alt="MIDI Invaders logo"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
         <p className="eyebrow">Free Online • Browser Arcade</p>
         <h1>MIDI Invaders</h1>
         <p className="hero-copy">

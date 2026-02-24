@@ -104,7 +104,17 @@ export function HudOverlay({
 
   return (
     <aside className="hud-panel">
-      <h1>MIDI Invaders</h1>
+      <div className="hud-title">
+        <img
+          className="hud-title-logo"
+          src="/logo.png"
+          alt="MIDI Invaders logo"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
+        <h1>MIDI Invaders</h1>
+      </div>
       <label className="input-label" htmlFor="input-mode">
         Input Mode
       </label>
