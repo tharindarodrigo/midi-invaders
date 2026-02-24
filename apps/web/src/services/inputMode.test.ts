@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { canStartWithInputMode, shouldProcessInputEvent } from '@/services/inputMode';
+import {
+  canStartWithInputMode,
+  resolvePreferredInputMode,
+  shouldProcessInputEvent,
+} from '@/services/inputMode';
 import type { InputNoteEvent } from '@/types/input';
 
 const midiEvent: InputNoteEvent = {
@@ -36,6 +40,19 @@ const microphoneEvent: InputNoteEvent = {
 };
 
 describe('input mode', () => {
+  it('prefers microphone mode on mobile when microphone input is supported', () => {
+    expect(resolvePreferredInputMode(true, true)).toBe('microphone');
+  });
+
+  it('falls back to keyboard mode on mobile when microphone input is unavailable', () => {
+    expect(resolvePreferredInputMode(true, false)).toBe('keyboard');
+  });
+
+  it('defaults to keyboard mode for non-mobile viewports', () => {
+    expect(resolvePreferredInputMode(false, true)).toBe('keyboard');
+    expect(resolvePreferredInputMode(false, false)).toBe('keyboard');
+  });
+
   it('always allows starting in keyboard mode', () => {
     expect(canStartWithInputMode('keyboard', 'idle', null, 'idle')).toBe(true);
     expect(canStartWithInputMode('keyboard', 'error', null, 'error')).toBe(true);

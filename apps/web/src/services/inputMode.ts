@@ -3,6 +3,13 @@ import type { InputNoteEvent, InputSource } from '@/types/input';
 export type InputMode = InputSource;
 export type MidiStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
+export const resolvePreferredInputMode = (
+  isMobile: boolean,
+  microphoneSupported: boolean,
+): InputMode => {
+  return isMobile && microphoneSupported ? 'microphone' : 'keyboard';
+};
+
 export const canStartWithInputMode = (
   inputMode: InputMode,
   midiStatus: MidiStatus,

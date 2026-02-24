@@ -7,7 +7,11 @@ import {
   setAnalyticsEnabled as setAnalyticsEnabledPreference,
   trackAnalyticsEvent,
 } from '@/services/analytics';
-import { canStartWithInputMode, shouldProcessInputEvent } from '@/services/inputMode';
+import {
+  canStartWithInputMode,
+  resolvePreferredInputMode,
+  shouldProcessInputEvent,
+} from '@/services/inputMode';
 import { bindKeyboardFallback } from '@/services/keyboardFallback';
 import { KeyboardSynth } from '@/services/keyboardSynth';
 import { MicrophonePitchService, supportsMicrophoneInput } from '@/services/microphone';
@@ -68,6 +72,17 @@ export default function App() {
 
   const midiSupported = useMemo(() => supportsWebMidi(), []);
   const microphoneSupported = useMemo(() => supportsMicrophoneInput(), []);
+  const isLikelyMobile = useMemo(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+
+    return window.matchMedia('(max-width: 900px), (pointer: coarse)').matches;
+  }, []);
+  const initialInputMode = useMemo<AnalyticsInputMode>(
+    () => resolvePreferredInputMode(isLikelyMobile, microphoneSupported),
+    [isLikelyMobile, microphoneSupported],
+  );
 
   const [hud, setHud] = useState<HudState>(initialHud);
   const [midiStatus, setMidiStatus] = useState<'idle' | 'connecting' | 'ready' | 'error'>('idle');
@@ -76,7 +91,7 @@ export default function App() {
   const [microphoneError, setMicrophoneError] = useState<string | null>(null);
   const [midiDevices, setMidiDevices] = useState<MidiInputDevice[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string | null>(null);
-  const [selectedInputMode, setSelectedInputMode] = useState<AnalyticsInputMode>('keyboard');
+  const [selectedInputMode, setSelectedInputMode] = useState<AnalyticsInputMode>(initialInputMode);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>(DEFAULT_GAMEPLAY_SETTINGS.difficulty);
   const [selectedGameMode, setSelectedGameMode] = useState<GameMode>(DEFAULT_GAMEPLAY_SETTINGS.mode);
   const [selectedClefMode, setSelectedClefMode] = useState<ClefMode>(DEFAULT_GAMEPLAY_SETTINGS.clefMode);
@@ -85,7 +100,7 @@ export default function App() {
   const [analyticsEnabled, setAnalyticsEnabledState] = useState<boolean>(() => isAnalyticsEnabled());
   const [noteHistory, setNoteHistory] = useState<InputNoteEvent[]>([]);
   const preferredInputIdRef = useRef<string | null>(getStoredMidiInputId());
-  const selectedInputModeRef = useRef<AnalyticsInputMode>('keyboard');
+  const selectedInputModeRef = useRef<AnalyticsInputMode>(initialInputMode);
   const selectedMidiInputIdRef = useRef<string | null>(null);
   const microphoneSuppressedRef = useRef(false);
   const hudRef = useRef<HudState>(initialHud);
@@ -443,14 +458,22 @@ export default function App() {
       : selectedGameMode === 'pitch'
         ? 'Pitch Recognition'
         : 'Arcade';
-  const startButtonLabel = canStartGame
-    ? 'Play'
+  const startButtonLabel = 'Play';
+  const heroPrimaryBusy =
+    (selectedInputMode === 'microphone' && microphoneStatus === 'connecting')
+    || (selectedInputMode === 'midi' && midiStatus === 'connecting');
+  const heroPrimaryLabel = canStartGame
+    ? 'Play Now'
     : selectedInputMode === 'microphone'
-      ? 'Connect Microphone to Play'
-      : 'Connect MIDI to Play';
+      ? microphoneStatus === 'connecting'
+        ? 'Connecting Microphone...'
+        : 'Connect Microphone'
+      : selectedInputMode === 'midi'
+        ? midiStatus === 'connecting'
+          ? 'Connecting MIDI...'
+          : 'Connect MIDI'
+        : 'Play Now';
   const livesLabel = Number.isFinite(hud.lives) ? `${hud.lives}` : '∞';
-  const overlayModeLabel =
-    hud.mode === 'practice' ? 'Practice' : hud.mode === 'pitch' ? 'Pitch Recognition' : 'Arcade';
   const overlayMissPenalty = hud.mode === 'pitch' ? 25 : 50;
   const gameplayFocusedLayout = hud.scene === 'game';
 
@@ -467,15 +490,25 @@ export default function App() {
             <div className="hero-actions">
               <button
                 className="hero-button primary"
-                disabled={!canStartGame}
+                disabled={heroPrimaryBusy}
                 onClick={() => {
                   canvasSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   if (canStartGame) {
                     startGame();
+                    return;
+                  }
+
+                  if (selectedInputMode === 'microphone') {
+                    void connectMicrophone();
+                    return;
+                  }
+
+                  if (selectedInputMode === 'midi') {
+                    void connectMidi();
                   }
                 }}
               >
-                Play Now
+                {heroPrimaryLabel}
               </button>
               <button
                 className="hero-button ghost"
@@ -544,21 +577,7 @@ export default function App() {
           {hud.scene === 'game' ? (
             <>
               <div className="game-stats-layer" aria-label="Gameplay stats">
-                <aside className="game-stats-panel left">
-                  <p className="game-stat-row">
-                    <span className="game-stat-label">Mode</span>
-                    <span className="game-stat-value">{overlayModeLabel}</span>
-                  </p>
-                  <p className="game-stat-row">
-                    <span className="game-stat-label">Wave</span>
-                    <span className="game-stat-value">{hud.wave}</span>
-                  </p>
-                  <p className="game-stat-row">
-                    <span className="game-stat-label">Invaders</span>
-                    <span className="game-stat-value">{hud.activeInvaders}</span>
-                  </p>
-                </aside>
-                <aside className="game-stats-panel right">
+                <aside className="game-stats-panel score-overlay">
                   <p className="game-score-title">Score</p>
                   <p className="game-score-value">{hud.score.toLocaleString()}</p>
                   <p className="game-stat-row">
@@ -662,11 +681,16 @@ export default function App() {
               </div>
               <p>
                 {selectedInputMode === 'keyboard'
-                  ? 'Keyboard mode is ready now. Use the key map below to play without a MIDI device.'
+                  ? isLikelyMobile
+                    ? 'Keyboard mode on phones/tablets requires a connected hardware keyboard.'
+                    : 'Keyboard mode is ready now. Use the key map below to play without a MIDI device.'
                   : selectedInputMode === 'midi'
                     ? 'MIDI mode requires a connected MIDI input device.'
                     : 'Microphone mode requires granting microphone access, then playing clear single pitches.'}
               </p>
+              {isLikelyMobile && selectedInputMode === 'keyboard' ? (
+                <p className="status">Mobile note: Computer Keyboard mode requires a hardware keyboard on phone.</p>
+              ) : null}
               {selectedGameMode === 'pitch' ? (
                 <p>Pitch mode is non-visual: invaders play repeating melodies. No note notation is shown.</p>
               ) : selectedGameMode === 'practice' ? (
@@ -674,36 +698,50 @@ export default function App() {
               ) : selectedDifficulty === 2 ? (
                 <p>Level 2 uses C2-C4 targets with an A3-C4 bass/treble overlap and up to two ledger lines per clef.</p>
               ) : null}
-              <svg className="keyboard-svg" viewBox="0 0 420 146" role="img" aria-label="Keyboard guide">
-                <rect x="0" y="0" width="420" height="146" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
-                <g fill="#f8fafc" stroke="#0f172a" strokeWidth="1.5">
-                  <rect x="16" y="12" width="42" height="94" rx="4" />
-                  <rect x="58" y="12" width="42" height="94" rx="4" />
-                  <rect x="100" y="12" width="42" height="94" rx="4" />
-                  <rect x="142" y="12" width="42" height="94" rx="4" />
-                  <rect x="184" y="12" width="42" height="94" rx="4" />
-                  <rect x="226" y="12" width="42" height="94" rx="4" />
-                  <rect x="268" y="12" width="42" height="94" rx="4" />
-                  <rect x="310" y="12" width="42" height="94" rx="4" />
-                  <rect x="352" y="12" width="42" height="94" rx="4" />
-                </g>
-                <g fill="#0f172a">
-                  <rect x="45" y="12" width="26" height="58" rx="3" />
-                  <rect x="87" y="12" width="26" height="58" rx="3" />
-                  <rect x="171" y="12" width="26" height="58" rx="3" />
-                  <rect x="213" y="12" width="26" height="58" rx="3" />
-                  <rect x="255" y="12" width="26" height="58" rx="3" />
-                  <rect x="339" y="12" width="26" height="58" rx="3" />
-                </g>
-                <text x="24" y="122" fill="#e2e8f0" fontSize="12">
-                  <tspan x="24" dy="0">
-                    Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 3 4 6 7 8)
-                  </tspan>
-                  <tspan x="24" dy="14">
-                    CapsLock ON: shift keyboard notes down 2 octaves (bass range).
-                  </tspan>
-                </text>
-              </svg>
+              {selectedInputMode === 'keyboard' ? (
+                <svg className="keyboard-svg" viewBox="0 0 420 146" role="img" aria-label="Keyboard guide">
+                  <rect x="0" y="0" width="420" height="146" rx="12" fill="rgb(15 23 42 / 72%)" stroke="rgb(34 211 238 / 48%)" />
+                  <g fill="#f8fafc" stroke="#0f172a" strokeWidth="1.5">
+                    <rect x="16" y="12" width="42" height="94" rx="4" />
+                    <rect x="58" y="12" width="42" height="94" rx="4" />
+                    <rect x="100" y="12" width="42" height="94" rx="4" />
+                    <rect x="142" y="12" width="42" height="94" rx="4" />
+                    <rect x="184" y="12" width="42" height="94" rx="4" />
+                    <rect x="226" y="12" width="42" height="94" rx="4" />
+                    <rect x="268" y="12" width="42" height="94" rx="4" />
+                    <rect x="310" y="12" width="42" height="94" rx="4" />
+                    <rect x="352" y="12" width="42" height="94" rx="4" />
+                  </g>
+                  <g fill="#0f172a">
+                    <rect x="45" y="12" width="26" height="58" rx="3" />
+                    <rect x="87" y="12" width="26" height="58" rx="3" />
+                    <rect x="171" y="12" width="26" height="58" rx="3" />
+                    <rect x="213" y="12" width="26" height="58" rx="3" />
+                    <rect x="255" y="12" width="26" height="58" rx="3" />
+                    <rect x="339" y="12" width="26" height="58" rx="3" />
+                  </g>
+                  <text x="24" y="122" fill="#e2e8f0" fontSize="12">
+                    <tspan x="24" dy="0">
+                      Keys: C4 (Z X C V B N M + S D G H J), C5 (W E R T Y U I + 3 4 6 7 8)
+                    </tspan>
+                    <tspan x="24" dy="14">
+                      CapsLock ON: shift keyboard notes down 2 octaves (bass range).
+                    </tspan>
+                  </text>
+                </svg>
+              ) : null}
+              {selectedInputMode === 'microphone' && microphoneStatus !== 'ready' ? (
+                <button
+                  className="start-connect-button"
+                  type="button"
+                  onClick={() => {
+                    void connectMicrophone();
+                  }}
+                  disabled={microphoneStatus === 'connecting'}
+                >
+                  {microphoneStatus === 'connecting' ? 'Connecting Microphone...' : 'Connect Microphone'}
+                </button>
+              ) : null}
               <button
                 className="game-start-button"
                 disabled={!canStartGame}
