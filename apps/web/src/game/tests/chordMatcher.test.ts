@@ -111,6 +111,72 @@ describe('chord matcher', () => {
     expect(miss.target).toBeNull();
   });
 
+  it('accepts semitone drift when tolerance is enabled', () => {
+    const matcher = new ChordMatcher(120, 900);
+    const invader = makeChordInvader('c-major', [60, 64, 67], 420, 270);
+
+    matcher.matchChord({
+      invaders: [invader],
+      note: 59,
+      now: 100,
+      centerX: 360,
+      centerY: 270,
+      noteToleranceSemitones: 1,
+    });
+    matcher.matchChord({
+      invaders: [invader],
+      note: 64,
+      now: 170,
+      centerX: 360,
+      centerY: 270,
+      noteToleranceSemitones: 1,
+    });
+    const result = matcher.matchChord({
+      invaders: [invader],
+      note: 67,
+      now: 240,
+      centerX: 360,
+      centerY: 270,
+      noteToleranceSemitones: 1,
+    });
+
+    expect(result.kind).toBe('hit');
+    expect(result.target?.id).toBe('c-major');
+  });
+
+  it('supports longer arpeggio windows when overridden', () => {
+    const matcher = new ChordMatcher(120, 900);
+    const invader = makeChordInvader('d-major', [62, 66, 69], 420, 270);
+
+    matcher.matchChord({
+      invaders: [invader],
+      note: 62,
+      now: 100,
+      centerX: 360,
+      centerY: 270,
+      arpeggioWindowMs: 1800,
+    });
+    matcher.matchChord({
+      invaders: [invader],
+      note: 66,
+      now: 850,
+      centerX: 360,
+      centerY: 270,
+      arpeggioWindowMs: 1800,
+    });
+    const result = matcher.matchChord({
+      invaders: [invader],
+      note: 69,
+      now: 1600,
+      centerX: 360,
+      centerY: 270,
+      arpeggioWindowMs: 1800,
+    });
+
+    expect(result.kind).toBe('hit');
+    expect(result.target?.id).toBe('d-major');
+  });
+
   it('selects nearest threat when multiple chord targets match', () => {
     const matcher = new ChordMatcher(120, 900);
     const invaders = [

@@ -5,6 +5,7 @@ import type {
   InvaderEntity,
   NoteProcessResult,
 } from '@/types/gameplay';
+import type { InputSource } from '@/types/input';
 import { getArcadeWaveRuleForWave } from '@/game/arenaConfig';
 import { resolveInvaderClef } from '@/game/notationProfile';
 import { createLaserShot } from '@/game/systems/combatSystem';
@@ -23,6 +24,8 @@ const LIFE_UP_THRESHOLD = 1000;
 const POWER_UP_DESTROY_COUNT = 5;
 const SPAWN_SELECTION_ATTEMPTS = 12;
 const WAVE_SCORE_THRESHOLD = 1000;
+const MICROPHONE_NOTE_TOLERANCE = 1;
+const MICROPHONE_CHORD_ARPEGGIO_WINDOW_MS = 1800;
 
 const createInitialState = (config: ArenaConfig): ArenaState => ({
   score: 0,
@@ -87,7 +90,7 @@ export class GameStateSystem {
     return this.state;
   }
 
-  processNote(note: number, now: number): NoteProcessResult {
+  processNote(note: number, now: number, source: InputSource = 'keyboard'): NoteProcessResult {
     if (this.state.gameOver) {
       return this.createIgnoredResult();
     }
@@ -96,12 +99,19 @@ export class GameStateSystem {
       return this.processPitchNote(note, now);
     }
 
+    const isMicrophoneInput = source === 'microphone';
+    const noteToleranceSemitones = isMicrophoneInput ? MICROPHONE_NOTE_TOLERANCE : 0;
+
     const chordResolution = this.chordMatcher.matchChord({
       invaders: this.state.invaders,
       note,
       now,
       centerX: this.config.centerX,
       centerY: this.config.centerY,
+      noteToleranceSemitones,
+      arpeggioWindowMs: isMicrophoneInput
+        ? Math.max(this.config.chordArpeggioWindowMs, MICROPHONE_CHORD_ARPEGGIO_WINDOW_MS)
+        : this.config.chordArpeggioWindowMs,
     });
     if (chordResolution.kind === 'hit' && chordResolution.target) {
       return this.processHit(chordResolution.target, now);
@@ -112,6 +122,7 @@ export class GameStateSystem {
       note,
       centerX: this.config.centerX,
       centerY: this.config.centerY,
+      noteToleranceSemitones,
     });
     if (singleResolution.matched && singleResolution.target) {
       return this.processHit(singleResolution.target, now);

@@ -18,6 +18,7 @@ const MIN_AUTOCORRELATION_CONFIDENCE = 0.2;
 const FIRST_PEAK_CORRELATION_RATIO = 0.45;
 // Require the same detected note across a few frames before emitting note_on/switch.
 const NOTE_STABILITY_FRAMES = 3;
+const NOTE_STABILITY_TOLERANCE = 1;
 // 2048 balances pitch stability and latency for real-time gameplay.
 const PITCH_DETECTION_FFT_SIZE = 2048;
 const DEFAULT_MICROPHONE_VELOCITY = 100;
@@ -41,13 +42,17 @@ export const confirmStableMidiNote = (
   state: PitchStabilityState,
   detectedNote: number | null,
   requiredFrames: number = NOTE_STABILITY_FRAMES,
+  toleranceSemitones: number = 0,
 ): number | null => {
   if (detectedNote === null) {
     resetPitchStabilityState(state);
     return null;
   }
 
-  if (state.candidateNote === detectedNote) {
+  if (
+    state.candidateNote !== null
+    && Math.abs(state.candidateNote - detectedNote) <= toleranceSemitones
+  ) {
     state.candidateFrames += 1;
   } else {
     state.candidateNote = detectedNote;
@@ -271,7 +276,12 @@ export class MicrophonePitchService {
       const frequency = detectPitchFromBuffer(data, audioContext.sampleRate);
       const midiNote = frequency !== null ? frequencyToMidiNote(frequency) : null;
       if (midiNote !== null) {
-        const stableNote = confirmStableMidiNote(this.pitchStabilityState, midiNote);
+        const stableNote = confirmStableMidiNote(
+          this.pitchStabilityState,
+          midiNote,
+          NOTE_STABILITY_FRAMES,
+          NOTE_STABILITY_TOLERANCE,
+        );
         if (stableNote !== null) {
           if (this.activeNote === null) {
             this.activeNote = stableNote;

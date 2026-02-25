@@ -211,7 +211,7 @@ export class GameScene extends Phaser.Scene {
 
     this.applyPendingFreezeDelay();
 
-    const result = this.gameState.processNote(event.note, this.time.now);
+    const result = this.gameState.processNote(event.note, this.time.now, event.source);
 
     if (result.kind === 'ignored') {
       this.publishHud();

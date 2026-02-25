@@ -12,6 +12,8 @@ interface MatchChordArgs {
   now: number;
   centerX: number;
   centerY: number;
+  noteToleranceSemitones?: number;
+  arpeggioWindowMs?: number;
 }
 
 export interface ChordMatchResult {
@@ -22,11 +24,15 @@ export interface ChordMatchResult {
 const uniqueAscending = (notes: number[]): number[] =>
   [...new Set(notes)].sort((left, right) => left - right);
 
+const isNoteMatch = (detectedNote: number, requiredNote: number, toleranceSemitones: number): boolean =>
+  Math.abs(detectedNote - requiredNote) <= toleranceSemitones;
+
 const matchesSimultaneousWindow = (
   requiredNotes: number[],
   recentNotes: BufferedNoteOn[],
   now: number,
   simultaneousWindowMs: number,
+  noteToleranceSemitones: number,
 ): boolean => {
   if (requiredNotes.length < 3) {
     return false;
@@ -42,12 +48,15 @@ const matchesSimultaneousWindow = (
     return false;
   }
 
-  return requiredNotes.every((required) => notesInWindow.has(required));
+  const detectedNotes = [...notesInWindow];
+  return requiredNotes.every((required) =>
+    detectedNotes.some((detected) => isNoteMatch(detected, required, noteToleranceSemitones)));
 };
 
 const matchesAscendingArpeggio = (
   requiredNotes: number[],
   recentNotes: BufferedNoteOn[],
+  noteToleranceSemitones: number,
 ): boolean => {
   if (requiredNotes.length < 3) {
     return false;
@@ -56,7 +65,7 @@ const matchesAscendingArpeggio = (
   let nextRequiredIndex = 0;
   for (const event of recentNotes) {
     const nextRequired = requiredNotes[nextRequiredIndex];
-    if (event.note !== nextRequired) {
+    if (!isNoteMatch(event.note, nextRequired, noteToleranceSemitones)) {
       continue;
     }
 
@@ -81,8 +90,16 @@ export class ChordMatcher {
     this.recentNoteOns.length = 0;
   }
 
-  matchChord({ invaders, note, now, centerX, centerY }: MatchChordArgs): ChordMatchResult {
-    this.appendNote(note, now);
+  matchChord({
+    invaders,
+    note,
+    now,
+    centerX,
+    centerY,
+    noteToleranceSemitones = 0,
+    arpeggioWindowMs,
+  }: MatchChordArgs): ChordMatchResult {
+    this.appendNote(note, now, arpeggioWindowMs ?? this.arpeggioWindowMs);
 
     const chordInvaders = invaders.filter(
       (invader) => invader.targetType === 'chord' && invader.requiredNotes.length >= 3,
@@ -101,14 +118,19 @@ export class ChordMatcher {
         this.recentNoteOns,
         now,
         this.simultaneousWindowMs,
+        noteToleranceSemitones,
       );
-      const hitByArpeggio = matchesAscendingArpeggio(requiredNotes, this.recentNoteOns);
+      const hitByArpeggio = matchesAscendingArpeggio(
+        requiredNotes,
+        this.recentNoteOns,
+        noteToleranceSemitones,
+      );
       if (hitBySimultaneous || hitByArpeggio) {
         hitCandidates.push(invader);
         continue;
       }
 
-      if (requiredNotes.includes(note)) {
+      if (requiredNotes.some((required) => isNoteMatch(note, required, noteToleranceSemitones))) {
         progressCandidates.push(invader);
       }
     }
@@ -136,9 +158,9 @@ export class ChordMatcher {
     };
   }
 
-  private appendNote(note: number, now: number): void {
+  private appendNote(note: number, now: number, arpeggioWindowMs: number): void {
     this.recentNoteOns.push({ note, at: now });
-    const minTimestamp = now - this.arpeggioWindowMs;
+    const minTimestamp = now - arpeggioWindowMs;
     while (this.recentNoteOns.length > 0 && this.recentNoteOns[0].at < minTimestamp) {
       this.recentNoteOns.shift();
     }

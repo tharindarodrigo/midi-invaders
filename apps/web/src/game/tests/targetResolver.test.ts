@@ -55,6 +55,19 @@ describe('target resolver', () => {
     expect(resolution.target).toBeNull();
   });
 
+  it('matches nearby note values when tolerance is provided', () => {
+    const resolution = resolveNearestThreatTarget({
+      invaders: [makeInvader('target', 60, 380, 270)],
+      note: 59,
+      centerX: 360,
+      centerY: 270,
+      noteToleranceSemitones: 1,
+    });
+
+    expect(resolution.matched).toBe(true);
+    expect(resolution.target?.id).toBe('target');
+  });
+
   it('ignores chord invaders for single-note matching', () => {
     const resolution = resolveNearestThreatTarget({
       invaders: [

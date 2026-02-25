@@ -160,7 +160,7 @@ export function HudOverlay({
               <button onClick={onConnectMicrophone} disabled={microphoneStatus === 'connecting'}>
                 {microphoneStatus === 'ready' ? 'Reconnect Microphone' : 'Connect Microphone'}
               </button>
-              <p>Play a clear single pitch to trigger note matching from your instrument or voice.</p>
+              <p>Play clear single pitches; for chord invaders, play a clean ascending arpeggio.</p>
               {microphoneError ? <p className="error">{microphoneError}</p> : null}
             </>
           ) : (

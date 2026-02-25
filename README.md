@@ -69,6 +69,7 @@
 - Feedback API uses session-bound tokens, one submission per session, honeypot checks, and endpoint rate limits to reduce bot spam.
 - In `Microphone Pitch` mode, click `Connect Microphone` and play clear single notes from voice/acoustic/electric instruments to trigger invader matches without MIDI hardware.
 - Microphone pitch note events now require a short stability window (3 consecutive frames, about 50ms) to reduce note jitter from instrument overtones.
+- Microphone note matching now accepts minor semitone drift (about `±1`) and gives chord arpeggios a longer recognition window for more reliable real-world microphone play.
 - Computer keyboard mode now plays synthesized note audio on key press/release.
 - In `Pitch Recognition` mode, invaders do not show notation. They play repeating prompts (about `2.8s` to `3.2s`, slower at level 2) and glow purple during playback.
 - `Pitch Recognition` mode uses ordered pitch patterns by difficulty: level 1 = 1 note, level 2 = 2 notes, level 3 = 3 notes.

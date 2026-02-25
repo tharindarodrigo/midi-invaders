@@ -131,4 +131,12 @@ describe('confirmStableMidiNote', () => {
     expect(confirmStableMidiNote(state, 64, 3)).toBeNull();
     expect(confirmStableMidiNote(state, 64, 3)).toBe(64);
   });
+
+  it('treats neighboring semitones as stable when tolerance is provided', () => {
+    const state = createPitchStabilityState();
+
+    expect(confirmStableMidiNote(state, 60, 3, 1)).toBeNull();
+    expect(confirmStableMidiNote(state, 59, 3, 1)).toBeNull();
+    expect(confirmStableMidiNote(state, 60, 3, 1)).toBe(60);
+  });
 });

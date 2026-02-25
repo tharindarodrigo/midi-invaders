@@ -272,6 +272,53 @@ describe('game state system', () => {
     expect(system.getState().score).toBe(200);
   });
 
+  it('accepts nearby semitone microphone input for middle C single-note targets', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(makeInvader('c4', 60, config.centerX + 140, config.centerY));
+    const result = system.processNote(59, 100, 'microphone');
+
+    expect(result.kind).toBe('hit');
+    expect(result.target?.id).toBe('c4');
+    expect(system.getState().score).toBe(100);
+  });
+
+  it('matches chord invaders with slower microphone arpeggio timing', () => {
+    const config = createArenaConfig(720, 540, 1, {
+      mode: 'arcade',
+    });
+    const system = new GameStateSystem(config, () => 0.3);
+    system.resetForTests(0);
+
+    system.addInvaderForTest(
+      makeInvader(
+        'mic-chord',
+        60,
+        config.centerX + 140,
+        config.centerY,
+        0,
+        0,
+        [60],
+        'chord',
+        [60, 64, 67],
+        200,
+      ),
+    );
+
+    const first = system.processNote(60, 100, 'microphone');
+    const second = system.processNote(64, 900, 'microphone');
+    const hit = system.processNote(67, 1650, 'microphone');
+
+    expect(first.kind).toBe('progress');
+    expect(second.kind).toBe('progress');
+    expect(hit.kind).toBe('hit');
+    expect(hit.scoreDelta).toBe(200);
+  });
+
   it('never spawns duplicate single-note invaders in arcade waves', () => {
     const config = createArenaConfig(720, 540, 1, {
       mode: 'arcade',

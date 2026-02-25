@@ -921,7 +921,7 @@ export default function App() {
                     : 'Keyboard mode is ready now. Use the key map below to play without a MIDI device.'
                   : selectedInputMode === 'midi'
                     ? 'MIDI mode requires a connected MIDI input device.'
-                    : 'Microphone mode requires granting microphone access, then playing clear single pitches.'}
+                    : 'Microphone mode requires microphone access, clear single pitches, and ascending arpeggios for chord targets.'}
               </p>
               {isLikelyMobile && selectedInputMode === 'keyboard' ? (
                 <p className="status">Mobile note: Computer Keyboard mode requires a hardware keyboard on phone.</p>

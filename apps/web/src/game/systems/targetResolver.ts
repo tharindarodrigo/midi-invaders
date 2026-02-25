@@ -5,6 +5,7 @@ interface ResolveTargetArgs {
   note: number;
   centerX: number;
   centerY: number;
+  noteToleranceSemitones?: number;
 }
 
 const distanceToCenter = (invader: InvaderEntity, centerX: number, centerY: number): number =>
@@ -38,6 +39,42 @@ export const resolveNearestByThreat = (
 };
 
 export const resolveNearestThreatTarget = ({
+  invaders,
+  note,
+  centerX,
+  centerY,
+  noteToleranceSemitones = 0,
+}: ResolveTargetArgs): TargetResolution => {
+  const matchCandidates = invaders.filter(
+    (invader) =>
+      (invader.targetType === 'single' || invader.targetType === 'pattern')
+      && Math.abs(invader.note - note) <= noteToleranceSemitones,
+  );
+
+  const match = matchCandidates.sort((left, right) => {
+    const leftPitchDistance = Math.abs(left.note - note);
+    const rightPitchDistance = Math.abs(right.note - note);
+    if (leftPitchDistance !== rightPitchDistance) {
+      return leftPitchDistance - rightPitchDistance;
+    }
+
+    return compareInvaderThreat(left, right, centerX, centerY);
+  })[0] ?? null;
+
+  if (!match) {
+    return {
+      matched: false,
+      target: null,
+    };
+  }
+
+  return {
+    matched: true,
+    target: match,
+  };
+};
+
+export const resolveNearestExactThreatTarget = ({
   invaders,
   note,
   centerX,
