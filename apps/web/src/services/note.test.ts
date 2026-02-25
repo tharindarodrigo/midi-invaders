@@ -6,8 +6,10 @@ describe('noteNumberToName', () => {
     expect(noteNumberToName(60)).toBe('C4');
   });
 
-  it('converts sharps correctly', () => {
-    expect(noteNumberToName(61)).toBe('C#4');
+  it('converts accidental notes using mixed sharp + flat spelling', () => {
+    expect(noteNumberToName(61)).toBe('Db4');
+    expect(noteNumberToName(66)).toBe('F#4');
+    expect(noteNumberToName(70)).toBe('Bb4');
   });
 
   it('handles out-of-range notes safely', () => {

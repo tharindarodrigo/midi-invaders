@@ -35,6 +35,7 @@ sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=${APP_DIR}|g" /etc/systemd/
 sudo cp ops/caddy/Caddyfile /etc/caddy/Caddyfile
 sudo sed -i "s|example.com|${DOMAIN}|g" /etc/caddy/Caddyfile
 sudo sed -i "s|root \\* /opt/midi-invaders/apps/web/dist|root * ${APP_DIR}/apps/web/dist|g" /etc/caddy/Caddyfile
+sudo sed -i "s|root \\* /opt/midi-invaders/apps/admin/dist|root * ${APP_DIR}/apps/admin/dist|g" /etc/caddy/Caddyfile
 
 sudo mkdir -p /etc/midi-invaders
 echo "Create /etc/midi-invaders/api.env with DATABASE_URL, PORT=3001, HOST=127.0.0.1"

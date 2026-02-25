@@ -7,9 +7,10 @@ describe('midiToVexKey', () => {
     expect(midiToVexKey(64)).toBe('e/4');
   });
 
-  it('maps sharp notes correctly', () => {
-    expect(midiToVexKey(61)).toBe('c#/4');
-    expect(midiToVexKey(70)).toBe('a#/4');
+  it('maps accidental notes using mixed sharp + flat spelling', () => {
+    expect(midiToVexKey(61)).toBe('db/4');
+    expect(midiToVexKey(66)).toBe('f#/4');
+    expect(midiToVexKey(70)).toBe('bb/4');
   });
 });
 

@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createArenaConfig } from '@/game/arenaConfig';
+import { midiToVexKey } from '@/services/notation';
 
 const timeToReachCoreSeconds = (
   config: ReturnType<typeof createArenaConfig>,
 ): number => (config.spawnRadius - config.coreRadius) / config.baseInvaderSpeed;
+
+const hasFlatSpelling = (midiNote: number): boolean => {
+  const vexKey = midiToVexKey(midiNote);
+  return /^[a-g]b\//.test(vexKey);
+};
 
 describe('arena config difficulty presets', () => {
   it('builds a fixed 6-wave arcade plan and ignores difficulty selection', () => {
@@ -94,5 +100,26 @@ describe('arena config difficulty presets', () => {
   it('keeps non-pitch mode penalty unchanged', () => {
     const arcade = createArenaConfig(1728, 1080, 1, { mode: 'arcade' });
     expect(arcade.missPenaltyPoints).toBe(50);
+  });
+
+  it('includes flat-spelled targets from wave 1 and through chord waves', () => {
+    const arcade = createArenaConfig(1728, 1080, 1, { mode: 'arcade' });
+    const wave1 = arcade.arcadeWaveRules[0];
+    const wave3 = arcade.arcadeWaveRules[2];
+    const wave4 = arcade.arcadeWaveRules[3];
+
+    expect(wave1).toBeTruthy();
+    expect(wave3).toBeTruthy();
+    expect(wave4).toBeTruthy();
+
+    const wave1HasFlat = (wave1?.singleNotePool ?? []).some((note) => hasFlatSpelling(note));
+    const wave3ChordNotes = (wave3?.chordRootPool ?? []).flatMap((root) => [root, root + 4, root + 7]);
+    const wave4ChordNotes = (wave4?.chordRootPool ?? []).flatMap((root) => [root, root + 4, root + 7]);
+    const wave3HasFlat = wave3ChordNotes.some((note) => hasFlatSpelling(note));
+    const wave4HasFlat = wave4ChordNotes.some((note) => hasFlatSpelling(note));
+
+    expect(wave1HasFlat).toBe(true);
+    expect(wave3HasFlat).toBe(true);
+    expect(wave4HasFlat).toBe(true);
   });
 });

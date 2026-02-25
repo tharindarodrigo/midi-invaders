@@ -1,7 +1,7 @@
 # Deployment Guide (VM + SSL + CI/CD)
 
 This project can run on one VM with:
-- `Caddy` for HTTPS + static web hosting + reverse proxy
+- `Caddy` for HTTPS + static web hosting (`/` gameplay + `/admin` admin app) + reverse proxy
 - `systemd` for API process management
 - GitHub Actions for automated deploys over SSH
 
@@ -94,6 +94,10 @@ The workflow does:
 4. Run Prisma migrations.
 5. Restart API and reload Caddy.
 
+Build outputs expected on server:
+- Gameplay frontend: `apps/web/dist`
+- Admin frontend: `apps/admin/dist`
+
 ## 4.1) Manual deploy after SSH + git pull
 
 If you want to deploy manually from the server:
@@ -131,6 +135,7 @@ After deploy:
 
 ```bash
 curl -I https://your-domain.com
+curl -I https://your-domain.com/admin
 curl https://your-domain.com/health
 curl https://your-domain.com/api/leaderboards
 ```

@@ -5,9 +5,9 @@ import path from 'node:path';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const apiProxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:3101';
-  const adminProxyTarget = env.VITE_ADMIN_PROXY_TARGET || 'http://localhost:5174';
 
   return {
+    base: '/admin/',
     plugins: [react()],
     resolve: {
       alias: {
@@ -15,18 +15,11 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      port: 5174,
+      strictPort: true,
       proxy: {
         '/api': {
           target: apiProxyTarget,
-          changeOrigin: true,
-        },
-        '^/admin$': {
-          target: adminProxyTarget,
-          changeOrigin: true,
-          rewrite: () => '/admin/',
-        },
-        '/admin': {
-          target: adminProxyTarget,
           changeOrigin: true,
         },
       },

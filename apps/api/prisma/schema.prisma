@@ -72,3 +72,43 @@ model FeedbackSubmission {
   @@index([createdAt])
   @@index([mode, difficulty, rating])
 }
+
+model AdminUser {
+  id            String              @id @default(cuid())
+  name          String
+  email         String              @unique
+  createdAt     DateTime            @default(now())
+  otpChallenges AdminOtpChallenge[]
+  sessions      AdminSession[]
+}
+
+model AdminOtpChallenge {
+  id                   String    @id @default(cuid())
+  adminUserId          String
+  otpHash              String
+  createdAt            DateTime  @default(now())
+  expiresAt            DateTime
+  consumedAt           DateTime?
+  requestIpHash        String?
+  requestUserAgentHash String?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId, createdAt])
+  @@index([expiresAt])
+}
+
+model AdminSession {
+  id                   String    @id @default(cuid())
+  adminUserId          String
+  tokenHash            String    @unique
+  createdAt            DateTime  @default(now())
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  issuedIpHash         String?
+  issuedUserAgentHash  String?
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}

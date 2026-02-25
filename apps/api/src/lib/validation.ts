@@ -1,4 +1,6 @@
 import {
+  type AdminAuthRequestOtpRequest,
+  type AdminAuthVerifyOtpRequest,
   isFeedbackDifficultyLevel,
   isFeedbackGameplayMode,
   isFeedbackInputMode,
@@ -17,6 +19,8 @@ const isPositiveInteger = (value: unknown): value is number =>
 
 const isFeedbackRating = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5;
+const isValidEmail = (value: string): boolean =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 export const parseStartSessionInput = (payload: unknown): GameSessionStartRequest | null => {
   if (typeof payload !== 'object' || payload === null) {
@@ -162,5 +166,47 @@ export const parseFeedbackSubmitInput = (payload: unknown): FeedbackSubmitReques
     score: maybe.score,
     durationMs: maybe.durationMs,
     inputMode: maybe.inputMode,
+  };
+};
+
+export const parseAdminAuthRequestOtpInput = (payload: unknown): AdminAuthRequestOtpRequest | null => {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+
+  const maybe = payload as Record<string, unknown>;
+  if (typeof maybe.email !== 'string') {
+    return null;
+  }
+
+  const normalizedEmail = maybe.email.trim().toLowerCase();
+  if (!isValidEmail(normalizedEmail)) {
+    return null;
+  }
+
+  return {
+    email: normalizedEmail,
+  };
+};
+
+export const parseAdminAuthVerifyOtpInput = (payload: unknown): AdminAuthVerifyOtpRequest | null => {
+  if (typeof payload !== 'object' || payload === null) {
+    return null;
+  }
+
+  const maybe = payload as Record<string, unknown>;
+  if (typeof maybe.email !== 'string' || typeof maybe.otp !== 'string') {
+    return null;
+  }
+
+  const normalizedEmail = maybe.email.trim().toLowerCase();
+  const otp = maybe.otp.trim();
+  if (!isValidEmail(normalizedEmail) || !/^\d{6}$/.test(otp)) {
+    return null;
+  }
+
+  return {
+    email: normalizedEmail,
+    otp,
   };
 };

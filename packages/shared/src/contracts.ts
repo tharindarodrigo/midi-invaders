@@ -81,6 +81,52 @@ export interface FeedbackSubmitResponse {
   feedbackId: string;
 }
 
+export interface AdminAuthRequestOtpRequest {
+  email: string;
+}
+
+export interface AdminAuthRequestOtpResponse {
+  ok: true;
+  expiresAt: string;
+}
+
+export interface AdminProfile {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface AdminAuthVerifyOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface AdminAuthVerifyOtpResponse {
+  ok: true;
+  token: string;
+  expiresAt: string;
+  admin: AdminProfile;
+}
+
+export interface AdminFeedbackEntry {
+  feedbackId: string;
+  sessionId: string;
+  rating: number;
+  feedback: string;
+  mode: FeedbackGameplayMode;
+  difficulty: FeedbackDifficultyLevel;
+  wave: number;
+  score: number;
+  durationMs: number;
+  inputMode: FeedbackInputMode;
+  riskFlags: string[];
+  createdAt: string;
+}
+
+export interface AdminFeedbackListResponse {
+  entries: AdminFeedbackEntry[];
+}
+
 export const isGameMode = (value: string): value is GameMode =>
   (GAME_MODES as readonly string[]).includes(value);
 

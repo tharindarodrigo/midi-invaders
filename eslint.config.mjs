@@ -34,6 +34,22 @@ export default [
     },
   },
   {
+    files: ['apps/admin/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  {
     files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts'],
     languageOptions: {
       globals: {
@@ -42,7 +58,7 @@ export default [
     },
   },
   {
-    files: ['**/*.test.ts', '**/test/**/*.ts'],
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/test/**/*.ts', '**/test/**/*.tsx'],
     languageOptions: {
       globals: {
         ...globals.vitest,

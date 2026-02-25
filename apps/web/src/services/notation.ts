@@ -1,6 +1,6 @@
 import { Accidental, Formatter, Renderer, Stave, StaveNote } from 'vexflow';
+import { getPitchClassNoteName } from '@/services/note';
 
-const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 const TREBLE_CENTER_LINE_MIDI = 71; // B4
 const BASS_CENTER_LINE_MIDI = 50; // D3
 const STAVE_HEIGHT_PX = 40;
@@ -34,10 +34,10 @@ export const getStemDirectionForMidi = (
 };
 
 const midiToPitch = (midiNote: number): { letter: string; accidental: string; octave: number } => {
-  const noteName = NOTE_NAMES[((midiNote % 12) + 12) % 12];
+  const noteName = getPitchClassNoteName(midiNote);
   const octave = Math.floor(midiNote / 12) - 1;
   const letter = noteName[0].toLowerCase();
-  const accidental = noteName.length > 1 ? '#' : '';
+  const accidental = noteName.length > 1 ? noteName[1] ?? '' : '';
 
   return { letter, accidental, octave };
 };
@@ -119,11 +119,12 @@ export const renderStaffNotesToCanvas = (
 
   for (let index = 0; index < vexKeys.length; index += 1) {
     const vexKey = vexKeys[index];
-    if (!vexKey || !vexKey.includes('#')) {
+    const accidentalSymbol = vexKey?.match(/^[a-g](#|b)?\//)?.[1];
+    if (!vexKey || !accidentalSymbol) {
       continue;
     }
 
-    const accidental = new Accidental('#');
+    const accidental = new Accidental(accidentalSymbol);
     accidental.setStyle({
       fillStyle: accidentalColor,
       strokeStyle: accidentalColor,

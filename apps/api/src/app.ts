@@ -8,6 +8,7 @@ import { registerSessionRoutes } from '@/routes/sessions';
 import { registerScoreRoutes } from '@/routes/scores';
 import { registerLeaderboardRoutes } from '@/routes/leaderboards';
 import { registerFeedbackRoutes } from '@/routes/feedback';
+import { registerAdminRoutes } from '@/routes/admin';
 
 interface BuildAppOptions {
   repository?: ApiRepository;
@@ -30,6 +31,7 @@ export const buildApp = async (options: BuildAppOptions = {}): Promise<FastifyIn
       await registerScoreRoutes(api);
       await registerLeaderboardRoutes(api);
       await registerFeedbackRoutes(api);
+      await registerAdminRoutes(api);
     }, { prefix: '/api' });
   });
 

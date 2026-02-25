@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+
+vi.mock('@/lib/adminOtpMailer', () => ({
+  sendAdminOtpEmail: vi.fn(async () => undefined),
+}));
+
 import { buildAppForTests } from '@/app';
+import { sendAdminOtpEmail } from '@/lib/adminOtpMailer';
 
 describe('API integration', () => {
   let app: FastifyInstance;
@@ -145,5 +151,115 @@ describe('API integration', () => {
     });
 
     expect(duplicateSubmitResponse.statusCode).toBe(409);
+  });
+
+  it('supports admin OTP login and feedback retrieval', async () => {
+    vi.mocked(sendAdminOtpEmail).mockClear();
+
+    const sessionResponse = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/start',
+      payload: { mode: 'classic', difficulty: 'easy' },
+    });
+    const { sessionId } = sessionResponse.json();
+
+    const feedbackTokenResponse = await app.inject({
+      method: 'POST',
+      url: '/api/feedback/token',
+      payload: { sessionId },
+    });
+    const feedbackToken = feedbackTokenResponse.json().token as string;
+
+    await app.repository.upsertFeedbackToken({
+      sessionId,
+      tokenHash: createHash('sha256').update(feedbackToken).digest('hex'),
+      issuedAt: new Date(Date.now() - 10_000).toISOString(),
+      expiresAt: feedbackTokenResponse.json().expiresAt,
+      issuedIpHash: null,
+      issuedUserAgentHash: null,
+    });
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/feedback/submit',
+      payload: {
+        sessionId,
+        token: feedbackToken,
+        rating: 4,
+        feedback: 'The new mobile onboarding is excellent.',
+        honeypot: '',
+        mode: 'practice',
+        difficulty: 2,
+        wave: 7,
+        score: 2400,
+        durationMs: 90000,
+        inputMode: 'midi',
+      },
+    });
+
+    const requestOtpResponse = await app.inject({
+      method: 'POST',
+      url: '/api/admin/auth/request-otp',
+      payload: {
+        email: 'tharindarodrigo@gmail.com',
+      },
+    });
+
+    expect(requestOtpResponse.statusCode).toBe(200);
+    expect(requestOtpResponse.json()).toEqual({
+      ok: true,
+      expiresAt: expect.any(String),
+    });
+
+    const mockedMailer = vi.mocked(sendAdminOtpEmail);
+    expect(mockedMailer).toHaveBeenCalledTimes(1);
+    const otp = mockedMailer.mock.calls[0]?.[0].otp;
+    expect(otp).toMatch(/^\d{6}$/);
+
+    const verifyOtpResponse = await app.inject({
+      method: 'POST',
+      url: '/api/admin/auth/verify-otp',
+      payload: {
+        email: 'tharindarodrigo@gmail.com',
+        otp,
+      },
+    });
+
+    expect(verifyOtpResponse.statusCode).toBe(200);
+    expect(verifyOtpResponse.json()).toEqual({
+      ok: true,
+      token: expect.any(String),
+      expiresAt: expect.any(String),
+      admin: {
+        id: expect.any(String),
+        name: 'Tharinda Rodrigo',
+        email: 'tharindarodrigo@gmail.com',
+      },
+    });
+
+    const unauthorizedResponse = await app.inject({
+      method: 'GET',
+      url: '/api/admin/feedback',
+    });
+    expect(unauthorizedResponse.statusCode).toBe(401);
+
+    const listResponse = await app.inject({
+      method: 'GET',
+      url: '/api/admin/feedback?limit=10',
+      headers: {
+        authorization: `Bearer ${verifyOtpResponse.json().token as string}`,
+      },
+    });
+
+    expect(listResponse.statusCode).toBe(200);
+    expect(listResponse.json()).toEqual({
+      entries: expect.arrayContaining([
+        expect.objectContaining({
+          sessionId,
+          rating: 4,
+          feedback: 'The new mobile onboarding is excellent.',
+        }),
+      ]),
+    });
   });
 });

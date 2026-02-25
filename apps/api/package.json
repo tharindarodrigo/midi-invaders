@@ -20,9 +20,11 @@
     "@prisma/client": "^6.16.2",
     "dotenv": "^16.6.1",
     "fastify": "^5.6.0",
-    "fastify-plugin": "^5.0.1"
+    "fastify-plugin": "^5.0.1",
+    "nodemailer": "^8.0.1"
   },
   "devDependencies": {
+    "@types/nodemailer": "^7.0.11",
     "prisma": "^6.16.2",
     "tsx": "^4.20.6"
   }

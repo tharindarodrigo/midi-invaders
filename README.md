@@ -5,7 +5,8 @@
 ## Quickstart (Current Scaffold)
 
 ### Monorepo layout
-- `apps/web` — React + Phaser + TypeScript client
+- `apps/web` — React + Phaser + TypeScript gameplay client
+- `apps/admin` — React + TypeScript + ShadCN admin panel
 - `apps/api` — Fastify + TypeScript + Prisma API
 - `packages/shared` — shared contracts/types
 
@@ -13,9 +14,29 @@
 1. `pnpm install`
 2. Create database: `createdb midi_invaders` (or `/opt/homebrew/opt/libpq/bin/createdb midi_invaders` if `createdb` is not on `PATH`)
 3. `cp apps/api/.env.example apps/api/.env` and set `DATABASE_URL`
-4. `pnpm -C apps/api exec prisma migrate dev --name init`
-5. `pnpm -C apps/web dev` (web client on Vite)
-6. `pnpm -C apps/api dev` (API on `http://localhost:3101`)
+4. `pnpm -C apps/api exec prisma migrate dev`
+5. `pnpm -C apps/web dev` (game client on Vite, `http://localhost:5173`)
+6. `pnpm -C apps/admin dev` (admin client on Vite, `http://localhost:5174`)
+7. `pnpm -C apps/api dev` (API on `http://localhost:3101`)
+
+Or run all apps together:
+- `pnpm dev`
+
+### Admin feedback panel (`/admin`)
+1. Set SMTP values in `apps/api/.env` for OTP delivery:
+   - `ADMIN_SMTP_HOST`
+   - `ADMIN_SMTP_PORT`
+   - `ADMIN_SMTP_SECURE`
+   - `ADMIN_SMTP_USER`
+   - `ADMIN_SMTP_PASS`
+   - `ADMIN_SMTP_FROM`
+2. Start all apps (`pnpm dev`) or start `apps/web`, `apps/admin`, and `apps/api` separately.
+3. Open `http://localhost:5173/admin` (proxied to `apps/admin` in development).
+4. Enter the seeded admin email `tharindarodrigo@gmail.com`, request OTP, then verify the code from email.
+5. After login, the panel lists the latest feedback submissions.
+
+Default seeded admin user:
+- `Tharinda Rodrigo <tharindarodrigo@gmail.com>`
 
 ### Web analytics (optional)
 1. `cp apps/web/.env.example apps/web/.env`
@@ -23,9 +44,10 @@
 3. Optional: set `VITE_POSTHOG_HOST` (defaults to `https://us.i.posthog.com`).
 4. Optional: set `VITE_API_BASE_URL` for custom API hosts (defaults to `/api`).
 5. Optional for Vite dev proxy: set `VITE_API_PROXY_TARGET` (defaults to `http://localhost:3101`).
-6. Analytics events are sent only for production builds when a PostHog key is configured and analytics is enabled.
-7. Default preference respects browser Do Not Track (`navigator.doNotTrack === "1"` disables tracking unless user enables it in the HUD).
-8. Phase 1 analytics are anonymous and exclude personal identifiers.
+6. Optional for Vite dev proxy: set `VITE_ADMIN_PROXY_TARGET` (defaults to `http://localhost:5174`).
+7. Analytics events are sent only for production builds when a PostHog key is configured and analytics is enabled.
+8. Default preference respects browser Do Not Track (`navigator.doNotTrack === "1"` disables tracking unless user enables it in the HUD).
+9. Phase 1 analytics are anonymous and exclude personal identifiers.
 
 ### Community
 - [![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/2pxrcPQU) Join our discord community
@@ -63,6 +85,7 @@
 - Invader approach speed now scales by arena travel distance so time-to-center stays consistent across screen sizes.
 - Arcade mode now runs a repeating 6-wave curriculum (treble singles, mixed-clef singles, treble chords, bass chords, mixed waves) with small in-wave speed ramps and per-wave speed resets; waves advance at each `1000` total-score block (`1000`, `2000`, `3000`, ...).
 - Chord invaders award `200` points and can be cleared with either block triads (near-simultaneous) or ascending arpeggios.
+- Staff notation now uses mixed enharmonic spellings so flats (for example `Db`, `Eb`, `Ab`, `Bb`) appear from wave 1 onward and continue through chord/triad waves.
 - Active single-note invaders now avoid duplicate note targets on canvas, and chord roots are prevented from overlapping active single-note targets.
 - Game Over now includes an in-app feedback form with 1-5 stars plus optional written feedback.
 - Feedback copy clearly states submissions are personally reviewed by the team (no AI auto-review).

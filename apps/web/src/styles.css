@@ -790,7 +790,7 @@ button:disabled {
     justify-content: center;
   }
 
-  .game-stats-panel {
+.game-stats-panel {
     width: calc(100% - 20px);
     min-width: 0;
     max-width: 100%;

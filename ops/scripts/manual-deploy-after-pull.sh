@@ -35,9 +35,14 @@ fi
 
 if [[ -f /etc/caddy/Caddyfile ]]; then
   EXPECTED_WEB_ROOT="root * ${REPO_ROOT}/apps/web/dist"
+  EXPECTED_ADMIN_ROOT="root * ${REPO_ROOT}/apps/admin/dist"
   if ! grep -Fq "${EXPECTED_WEB_ROOT}" /etc/caddy/Caddyfile; then
     echo "[manual-deploy] Warning: /etc/caddy/Caddyfile does not contain: ${EXPECTED_WEB_ROOT}"
     echo "[manual-deploy] Warning: Caddy may still be serving frontend from another directory."
+  fi
+  if ! grep -Fq "${EXPECTED_ADMIN_ROOT}" /etc/caddy/Caddyfile; then
+    echo "[manual-deploy] Warning: /etc/caddy/Caddyfile does not contain: ${EXPECTED_ADMIN_ROOT}"
+    echo "[manual-deploy] Warning: Caddy may not be serving /admin from this deploy directory."
   fi
 fi
 

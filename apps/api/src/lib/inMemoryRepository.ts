@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  AdminFeedbackEntry,
+  AdminProfile,
   FeedbackSubmitResponse,
   GameSessionStartRequest,
   LeaderboardEntry,
@@ -9,9 +11,19 @@ import type {
 import type {
   ApiRepository,
   FeedbackSubmissionCreateInput,
+  AdminOtpChallengeRecord,
+  AdminSessionRecord,
   FeedbackTokenRecord,
   SessionRecord,
 } from '@/lib/types';
+
+const DEFAULT_ADMIN_USERS: AdminProfile[] = [
+  {
+    id: 'admin-tharinda-rodrigo',
+    name: 'Tharinda Rodrigo',
+    email: 'tharindarodrigo@gmail.com',
+  },
+];
 
 export class InMemoryRepository implements ApiRepository {
   private readonly sessions = new Map<string, SessionRecord>();
@@ -22,6 +34,17 @@ export class InMemoryRepository implements ApiRepository {
     createdAt: string;
     payload: FeedbackSubmissionCreateInput;
   }>();
+  private readonly adminUsersByEmail = new Map<string, AdminProfile>();
+  private readonly adminUsersById = new Map<string, AdminProfile>();
+  private readonly adminOtpChallenges = new Map<string, AdminOtpChallengeRecord>();
+  private readonly adminSessionsByTokenHash = new Map<string, Omit<AdminSessionRecord, 'admin'>>();
+
+  constructor() {
+    for (const adminUser of DEFAULT_ADMIN_USERS) {
+      this.adminUsersByEmail.set(adminUser.email.toLowerCase(), adminUser);
+      this.adminUsersById.set(adminUser.id, adminUser);
+    }
+  }
 
   async createSession(input: GameSessionStartRequest): Promise<SessionRecord> {
     const createdAt = new Date().toISOString();
@@ -140,5 +163,118 @@ export class InMemoryRepository implements ApiRepository {
       ok: true,
       feedbackId,
     };
+  }
+
+  async getAdminUserByEmail(email: string): Promise<AdminProfile | null> {
+    return this.adminUsersByEmail.get(email.toLowerCase()) ?? null;
+  }
+
+  async createAdminOtpChallenge(input: {
+    adminUserId: string;
+    otpHash: string;
+    createdAt: string;
+    expiresAt: string;
+  }): Promise<AdminOtpChallengeRecord> {
+    const challenge: AdminOtpChallengeRecord = {
+      id: randomUUID(),
+      adminUserId: input.adminUserId,
+      otpHash: input.otpHash,
+      createdAt: input.createdAt,
+      expiresAt: input.expiresAt,
+      consumedAt: null,
+    };
+    this.adminOtpChallenges.set(challenge.id, challenge);
+    return challenge;
+  }
+
+  async consumeAdminOtpChallenge(input: {
+    adminUserId: string;
+    otpHash: string;
+    now: string;
+  }): Promise<boolean> {
+    const nowMs = new Date(input.now).getTime();
+    const matchingChallenge = [...this.adminOtpChallenges.values()]
+      .filter((challenge) =>
+        challenge.adminUserId === input.adminUserId
+        && challenge.otpHash === input.otpHash
+        && challenge.consumedAt === null
+        && new Date(challenge.expiresAt).getTime() > nowMs,
+      )
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+    if (!matchingChallenge) {
+      return false;
+    }
+
+    this.adminOtpChallenges.set(matchingChallenge.id, {
+      ...matchingChallenge,
+      consumedAt: input.now,
+    });
+    return true;
+  }
+
+  async createAdminSession(input: {
+    adminUserId: string;
+    tokenHash: string;
+    createdAt: string;
+    expiresAt: string;
+    issuedIpHash: string | null;
+    issuedUserAgentHash: string | null;
+  }): Promise<void> {
+    const session: Omit<AdminSessionRecord, 'admin'> = {
+      id: randomUUID(),
+      adminUserId: input.adminUserId,
+      tokenHash: input.tokenHash,
+      createdAt: input.createdAt,
+      expiresAt: input.expiresAt,
+      revokedAt: null,
+      issuedIpHash: input.issuedIpHash,
+      issuedUserAgentHash: input.issuedUserAgentHash,
+    };
+    this.adminSessionsByTokenHash.set(input.tokenHash, session);
+  }
+
+  async getActiveAdminSessionByTokenHash(input: {
+    tokenHash: string;
+    now: string;
+  }): Promise<AdminSessionRecord | null> {
+    const session = this.adminSessionsByTokenHash.get(input.tokenHash);
+    if (!session || session.revokedAt !== null) {
+      return null;
+    }
+
+    if (new Date(session.expiresAt).getTime() <= new Date(input.now).getTime()) {
+      return null;
+    }
+
+    const admin = this.adminUsersById.get(session.adminUserId);
+    if (!admin) {
+      return null;
+    }
+
+    return {
+      ...session,
+      admin,
+    };
+  }
+
+  async listFeedbackSubmissions(limit: number): Promise<AdminFeedbackEntry[]> {
+    return [...this.feedbackBySessionId.values()]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit)
+      .map((entry) => ({
+        feedbackId: entry.id,
+        sessionId: entry.payload.sessionId,
+        rating: entry.payload.rating,
+        feedback: entry.payload.feedback,
+        mode: entry.payload.mode,
+        difficulty: entry.payload.difficulty,
+        wave: entry.payload.wave,
+        score: entry.payload.score,
+        durationMs: entry.payload.durationMs,
+        inputMode: entry.payload.inputMode,
+        riskFlags: entry.payload.riskFlags,
+        createdAt: entry.createdAt,
+      }));
   }
 }

@@ -2,10 +2,6 @@
 example.com {
   encode gzip zstd
 
-  # Frontend (Vite build output)
-  root * /opt/midi-invaders/apps/web/dist
-  file_server
-
   # API server
   handle /api/* {
     reverse_proxy 127.0.0.1:3001
@@ -14,5 +10,19 @@ example.com {
   # Optional health endpoint passthrough
   handle /health {
     reverse_proxy 127.0.0.1:3001
+  }
+
+  # Admin frontend (/admin)
+  handle_path /admin* {
+    root * /opt/midi-invaders/apps/admin/dist
+    try_files {path} /index.html
+    file_server
+  }
+
+  # Gameplay frontend
+  handle {
+    root * /opt/midi-invaders/apps/web/dist
+    try_files {path} /index.html
+    file_server
   }
 }
